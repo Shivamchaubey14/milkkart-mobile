@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "MilkKart",
+    "slug": "milkkart-mobile",
+    "scheme": "milkkart",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "primaryColor": "#3bb77e",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#def9ec"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.milkkart.app"
+    },
+    "android": {
+      "package": "in.milkkart.app"
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}
