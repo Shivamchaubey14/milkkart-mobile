@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import type { Address } from "../api/baseApi";
 import AccountScreen from "../screens/AccountScreen";
 import AddAddressScreen from "../screens/AddAddressScreen";
 import ProfileScreen from "../screens/ProfileScreen";
@@ -7,7 +8,7 @@ import ProfileScreen from "../screens/ProfileScreen";
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   Account: undefined;
-  AddAddress: undefined;
+  AddAddress: { address?: Address } | undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();

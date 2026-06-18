@@ -154,6 +154,14 @@ export const api = createApi({
       query: (body) => ({ url: "/addresses/", method: "POST", body }),
       invalidatesTags: ["Address"],
     }),
+    updateAddress: build.mutation<Address, { id: number } & Partial<Address>>({
+      query: ({ id, ...body }) => ({ url: `/addresses/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["Address"],
+    }),
+    deleteAddress: build.mutation<void, number>({
+      query: (id) => ({ url: `/addresses/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["Address"],
+    }),
   }),
 });
 
@@ -168,4 +176,6 @@ export const {
   useProductsQuery,
   useAddressesQuery,
   useCreateAddressMutation,
+  useUpdateAddressMutation,
+  useDeleteAddressMutation,
 } = api;
