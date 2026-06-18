@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -26,9 +26,21 @@ export default function HomeScreen() {
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
   const catChips = [{ id: null as number | null, name: "All" }, ...(categories ?? [])];
 
-  const { data: products, isFetching } = useProductsQuery(
-    activeCatId ? { category: activeCatId } : undefined,
-  );
+  // Search box (debounced so we don't hit the API on every keystroke).
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(search.trim()), 350);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  // Search takes priority over the category filter while there's a query.
+  const productArg = query
+    ? { search: query }
+    : activeCatId
+      ? { category: activeCatId }
+      : undefined;
+  const { data: products, isFetching } = useProductsQuery(productArg);
 
   const [cart, setCart] = useState<Record<number, number>>({});
   const [wishlist, setWishlist] = useState<Record<number, boolean>>({});
@@ -63,7 +75,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.searchWrap}>
-            <SearchBar />
+            <SearchBar onChangeText={setSearch} />
           </View>
         </View>
 
@@ -104,12 +116,16 @@ export default function HomeScreen() {
             })}
           </ScrollView>
 
-          {/* Popular products */}
-          <Text style={styles.sectionTitle}>Popular Products</Text>
+          {/* Popular products / search results */}
+          <Text style={styles.sectionTitle}>
+            {query ? `Results for “${query}”` : "Popular Products"}
+          </Text>
           {!products && isFetching ? (
             <ActivityIndicator color={colors.green} style={{ marginTop: spacing(3) }} />
           ) : products && products.length === 0 ? (
-            <Text style={styles.empty}>No products in this category yet.</Text>
+            <Text style={styles.empty}>
+              {query ? `No products match “${query}”.` : "No products in this category yet."}
+            </Text>
           ) : (
             <View style={[styles.grid, isFetching && styles.gridFetching]}>
               {products?.map((p, i) => {
