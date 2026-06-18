@@ -17,7 +17,11 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const SIDE = spacing(2.5); // matches the Home content horizontal padding
 const CARD_W = Dimensions.get("window").width - SIDE * 2;
-const CARD_H = 150;
+// Mobile banner slot ratio (width:height). The card sizes itself to the device
+// width via aspectRatio, so it fits any screen. Designer banners exported at
+// this ratio (e.g. 1080×540) fill it perfectly; the existing 5:1 web images are
+// shown with `contain` so they aren't cropped (slight bands until re-exported).
+const BANNER_RATIO = 2;
 
 // Pull the hex stops out of a CSS string like "linear-gradient(120deg,#3bb77e,#1f8f5f)".
 function gradientColors(bg: string): [string, string] {
@@ -42,7 +46,7 @@ function BannerCard({ banner }: { banner: Banner }) {
   if (banner.image_url) {
     return (
       <View style={styles.card}>
-        <Image source={{ uri: banner.image_url }} style={styles.image} resizeMode="cover" />
+        <Image source={{ uri: banner.image_url }} style={styles.image} resizeMode="contain" />
       </View>
     );
   }
@@ -126,7 +130,7 @@ const styles = StyleSheet.create({
   track: { gap: spacing(1.5) },
   card: {
     width: CARD_W,
-    height: CARD_H,
+    aspectRatio: BANNER_RATIO,
     borderRadius: 18,
     overflow: "hidden",
     backgroundColor: colors.bgSoft,
