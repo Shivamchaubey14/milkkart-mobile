@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
-import HomeScreen from "../screens/HomeScreen";
+import HomeStack from "./HomeStack";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
 import ProfileStack from "./ProfileStack";
 import { colors, fonts } from "../theme";
@@ -43,7 +43,7 @@ export default function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Alerts" component={AlertsScreen} />
       <Tab.Screen name="Wishlist" component={WishlistScreen} />
       <Tab.Screen name="Cart" component={CartScreen} />

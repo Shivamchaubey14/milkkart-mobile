@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { useBannersQuery, useCategoriesQuery, useProductsQuery } from "../api/baseApi";
@@ -7,6 +9,7 @@ import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
+import type { HomeStackParamList } from "../navigation/HomeStack";
 import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -17,6 +20,7 @@ const BADGE_PINK = "#ff6b81";
 const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
 
 export default function HomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners } = useBannersQuery();
@@ -137,7 +141,11 @@ export default function HomeScreen() {
                 const wished = !!wishlist[p.id];
                 const img = imageUrl(p.image_url);
                 return (
-                  <View key={p.id} style={styles.card}>
+                  <Pressable
+                    key={p.id}
+                    style={styles.card}
+                    onPress={() => navigation.navigate("Product", { slug: p.slug })}
+                  >
                     <View style={[styles.cardArt, { backgroundColor: TINTS[i % TINTS.length] }]}>
                       {img ? (
                         <Image source={{ uri: img }} style={styles.cardImg} resizeMode="contain" />
@@ -203,7 +211,7 @@ export default function HomeScreen() {
                         )}
                       </View>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>

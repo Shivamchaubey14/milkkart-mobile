@@ -36,6 +36,31 @@ export type Variant = {
   mrp: string;
   discount_percent: number;
   in_stock: boolean;
+  is_default?: boolean;
+  quantity_value?: string;
+  unit?: string;
+};
+
+export type ProductDetail = {
+  id: number;
+  name: string;
+  slug: string;
+  brand: string;
+  description: string;
+  image_url: string;
+  tags: string;
+  category: Category;
+  variants: Variant[];
+  rating_average: number;
+  rating_count: number;
+};
+
+export type ProductRating = {
+  id: number;
+  rating: number;
+  comment: string;
+  user_name: string;
+  created_at: string;
 };
 
 export type CatalogProduct = {
@@ -110,7 +135,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address"],
+  tagTypes: ["Me", "Address", "Rating"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -145,6 +170,24 @@ export const api = createApi({
       },
       transformResponse: (r: Paginated<CatalogProduct>) => r.results,
     }),
+    productDetail: build.query<ProductDetail, string>({
+      query: (slug) => `/products/${slug}/`,
+    }),
+    productRatings: build.query<
+      { average: number; count: number; ratings: ProductRating[] },
+      number
+    >({
+      query: (id) => `/support/products/${id}/rating/`,
+      providesTags: ["Rating"],
+    }),
+    submitProductRating: build.mutation<unknown, { id: number; rating: number; comment: string }>({
+      query: ({ id, ...body }) => ({
+        url: `/support/products/${id}/rating/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Rating"],
+    }),
     addresses: build.query<Address[], void>({
       query: () => "/addresses/",
       transformResponse: (r: Address[] | Paginated<Address>) => (Array.isArray(r) ? r : r.results),
@@ -174,6 +217,9 @@ export const {
   useBannersQuery,
   useCategoriesQuery,
   useProductsQuery,
+  useProductDetailQuery,
+  useProductRatingsQuery,
+  useSubmitProductRatingMutation,
   useAddressesQuery,
   useCreateAddressMutation,
   useUpdateAddressMutation,
