@@ -51,6 +51,19 @@ export type CatalogProduct = {
   rating_count: number;
 };
 
+export type Address = {
+  id: number;
+  label: string;
+  address_line: string;
+  landmark: string;
+  city: string;
+  state: string;
+  pincode: string;
+  latitude: number | null;
+  longitude: number | null;
+  is_default: boolean;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -97,7 +110,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me"],
+  tagTypes: ["Me", "Address"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -128,6 +141,11 @@ export const api = createApi({
       },
       transformResponse: (r: Paginated<CatalogProduct>) => r.results,
     }),
+    addresses: build.query<Address[], void>({
+      query: () => "/addresses/",
+      transformResponse: (r: Address[] | Paginated<Address>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["Address"],
+    }),
   }),
 });
 
@@ -139,4 +157,5 @@ export const {
   useBannersQuery,
   useCategoriesQuery,
   useProductsQuery,
+  useAddressesQuery,
 } = api;
