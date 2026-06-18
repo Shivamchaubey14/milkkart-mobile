@@ -20,6 +20,17 @@ export type Banner = {
   bg_color: string;
 };
 
+export type Category = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  image: string | null;
+  product_count: number;
+};
+
+type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE,
   prepareHeaders: (headers, { getState }) => {
@@ -82,6 +93,10 @@ export const api = createApi({
     banners: build.query<Banner[], void>({
       query: () => "/banners/",
     }),
+    categories: build.query<Category[], void>({
+      query: () => "/categories/",
+      transformResponse: (r: Paginated<Category>) => r.results,
+    }),
   }),
 });
 
@@ -91,4 +106,5 @@ export const {
   useMeQuery,
   useLazyMeQuery,
   useBannersQuery,
+  useCategoriesQuery,
 } = api;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { useBannersQuery } from "../api/baseApi";
+import { useBannersQuery, useCategoriesQuery } from "../api/baseApi";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
@@ -10,8 +10,6 @@ import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const BADGE_PINK = "#ff6b81";
-
-const CATEGORIES = ["All", "Milk", "Curd & Yogurt", "Paneer & Cheese", "Bread & Bakery"];
 
 type Product = {
   id: string;
@@ -38,6 +36,9 @@ export default function HomeScreen() {
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners } = useBannersQuery();
+  const { data: categories } = useCategoriesQuery();
+  // "All" plus the live catalog categories.
+  const catChips = ["All", ...(categories?.map((c) => c.name) ?? [])];
 
   const [activeCat, setActiveCat] = useState("All");
   const [cart, setCart] = useState<Record<string, number>>(
@@ -104,7 +105,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
           >
-            {CATEGORIES.map((c) => {
+            {catChips.map((c) => {
               const active = c === activeCat;
               return (
                 <Pressable
