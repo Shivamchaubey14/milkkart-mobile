@@ -119,8 +119,13 @@ export const api = createApi({
       query: () => "/categories/",
       transformResponse: (r: Paginated<Category>) => r.results,
     }),
-    products: build.query<CatalogProduct[], { category?: number } | void>({
-      query: (arg) => (arg && arg.category ? `/products/?category=${arg.category}` : "/products/"),
+    products: build.query<CatalogProduct[], { category?: number; search?: string } | void>({
+      query: (arg) => {
+        const params: string[] = [];
+        if (arg?.category) params.push(`category=${arg.category}`);
+        if (arg?.search) params.push(`search=${encodeURIComponent(arg.search)}`);
+        return `/products/${params.length ? `?${params.join("&")}` : ""}`;
+      },
       transformResponse: (r: Paginated<CatalogProduct>) => r.results,
     }),
   }),
