@@ -162,7 +162,7 @@ export default function HomeScreen() {
                       <Text style={styles.cardCat} numberOfLines={1}>
                         {p.category_name}
                       </Text>
-                      <Text style={styles.cardName} numberOfLines={1}>
+                      <Text style={styles.cardName} numberOfLines={2}>
                         {p.name}
                       </Text>
 
@@ -197,7 +197,7 @@ export default function HomeScreen() {
                           </View>
                         ) : (
                           <Pressable onPress={() => inc(p.id)} style={styles.addBtn}>
-                            <Ionicons name="add" size={14} color={colors.green} />
+                            <Ionicons name="cart-outline" size={14} color={colors.green} />
                             <Text style={styles.addText}>Add</Text>
                           </Pressable>
                         )}
@@ -336,15 +336,17 @@ const styles = StyleSheet.create({
   ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 4, minHeight: 16 },
   ratingText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.text, marginLeft: 3 },
   noRating: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted },
-  priceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(1) },
-  priceLeft: { flexDirection: "row", alignItems: "baseline" },
+  priceRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: spacing(1) },
+  // Price stacked: current price on top, struck MRP below — keeps the row
+  // narrow so the Add button never gets pushed against the card edge.
+  priceLeft: { flexShrink: 1 },
   price: { fontFamily: fonts.bold, fontSize: 15, color: colors.green },
   mrp: {
     fontFamily: fontsAlt.regular,
     fontSize: 11,
     color: colors.muted,
     textDecorationLine: "line-through",
-    marginLeft: 4,
+    marginTop: 1,
   },
   addBtn: {
     flexDirection: "row",
@@ -353,6 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 5,
     paddingHorizontal: 9,
+    marginLeft: spacing(0.75),
   },
   addText: { fontFamily: fonts.bold, fontSize: 12, color: colors.green, marginLeft: 2 },
   stepper: {
@@ -361,6 +364,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green,
     borderRadius: 8,
     paddingHorizontal: 4,
+    marginLeft: spacing(0.75),
   },
   stepBtn: { width: 24, height: 28, alignItems: "center", justifyContent: "center" },
   stepQty: { fontFamily: fonts.bold, fontSize: 13, color: colors.white, minWidth: 16, textAlign: "center" },
