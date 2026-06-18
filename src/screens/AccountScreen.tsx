@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Address, useAddressesQuery } from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -47,7 +49,7 @@ function DetailRow({
 }
 
 export default function AccountScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
   const toast = useToast();
   const { data: addresses, isLoading } = useAddressesQuery();
@@ -57,12 +59,9 @@ export default function AccountScreen() {
   return (
     <Screen padded={false}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Header */}
+        {/* Header — matches the Profile screen's dark card. */}
         <View style={styles.header}>
           <View style={styles.blob} />
-          <Pressable style={styles.back} hitSlop={8} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={22} color={colors.white} />
-          </Pressable>
           <Text style={styles.headerTitle}>My Account</Text>
           <Text style={styles.headerSub}>Manage your details & addresses</Text>
         </View>
@@ -127,7 +126,7 @@ export default function AccountScreen() {
             ))
           )}
 
-          <Pressable style={styles.addBtn} onPress={soon("Add address")}>
+          <Pressable style={styles.addBtn} onPress={() => navigation.navigate("AddAddress")}>
             <Ionicons name="add" size={18} color={colors.green} />
             <Text style={styles.addText}>Add Address</Text>
           </Pressable>
@@ -141,14 +140,17 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: spacing(4) },
 
   // Header
+  // Same dimensions as the Profile screen's header card.
   header: {
     backgroundColor: colors.heading,
     borderRadius: 26,
     marginHorizontal: spacing(2.5),
     marginTop: spacing(1),
     paddingHorizontal: spacing(2.5),
-    paddingTop: spacing(2),
+    paddingTop: spacing(2.5),
     paddingBottom: spacing(3),
+    minHeight: 150,
+    justifyContent: "center",
     overflow: "hidden",
   },
   blob: {
@@ -160,7 +162,6 @@ const styles = StyleSheet.create({
     borderRadius: 75,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
-  back: { marginLeft: -spacing(0.5), marginBottom: spacing(1), alignSelf: "flex-start" },
   headerTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.white },
   headerSub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.green, marginTop: 3 },
 
