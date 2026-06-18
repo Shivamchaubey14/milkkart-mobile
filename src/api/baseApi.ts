@@ -20,6 +20,39 @@ export type Banner = {
   bg_color: string;
 };
 
+export type Category = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  image: string | null;
+  product_count: number;
+};
+
+export type Variant = {
+  id: number;
+  label: string;
+  price: string;
+  mrp: string;
+  discount_percent: number;
+  in_stock: boolean;
+};
+
+export type CatalogProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  brand: string;
+  image_url: string;
+  category: number;
+  category_name: string;
+  default_variant: Variant | null;
+  rating_average: number;
+  rating_count: number;
+};
+
+type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE,
   prepareHeaders: (headers, { getState }) => {
@@ -82,6 +115,19 @@ export const api = createApi({
     banners: build.query<Banner[], void>({
       query: () => "/banners/",
     }),
+    categories: build.query<Category[], void>({
+      query: () => "/categories/",
+      transformResponse: (r: Paginated<Category>) => r.results,
+    }),
+    products: build.query<CatalogProduct[], { category?: number; search?: string } | void>({
+      query: (arg) => {
+        const params: string[] = [];
+        if (arg?.category) params.push(`category=${arg.category}`);
+        if (arg?.search) params.push(`search=${encodeURIComponent(arg.search)}`);
+        return `/products/${params.length ? `?${params.join("&")}` : ""}`;
+      },
+      transformResponse: (r: Paginated<CatalogProduct>) => r.results,
+    }),
   }),
 });
 
@@ -91,4 +137,6 @@ export const {
   useMeQuery,
   useLazyMeQuery,
   useBannersQuery,
+  useCategoriesQuery,
+  useProductsQuery,
 } = api;

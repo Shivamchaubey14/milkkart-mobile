@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { useBannersQuery } from "../api/baseApi";
+import { useBannersQuery, useCategoriesQuery, useProductsQuery } from "../api/baseApi";
+import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
@@ -11,44 +12,41 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const BADGE_PINK = "#ff6b81";
 
-const CATEGORIES = ["All", "Milk", "Curd & Yogurt", "Paneer & Cheese", "Bread & Bakery"];
-
-type Product = {
-  id: string;
-  name: string;
-  category: string;
-  price: number;
-  mrp?: number;
-  discount?: number;
-  rating?: number;
-  ratingCount?: number;
-  tint: string;
-  qty?: number; // demo: a non-zero qty shows the stepper instead of "Add"
-  wishlisted?: boolean;
-};
-
-const PRODUCTS: Product[] = [
-  { id: "1", name: "Brown Bread", category: "Bread & Bakery", price: 45, mrp: 49, discount: 9, rating: 5.0, ratingCount: 4, tint: "#fde2e4" },
-  { id: "2", name: "Sandwich Bread", category: "Bread & Bakery", price: 40, mrp: 43, discount: 8, tint: "#e2ecf9", qty: 1 },
-  { id: "3", name: "Full Cream Milk 1L", category: "Milk", price: 56, mrp: 61, discount: 9, rating: 4.6, ratingCount: 24, tint: "#fde2e4", wishlisted: true },
-  { id: "4", name: "Fresh Paneer 200g", category: "Paneer & Cheese", price: 90, rating: 4.7, ratingCount: 12, tint: "#f6efdf" },
-];
+// Pastel placeholder backgrounds, assigned per card by index (product images
+// are served by the web, not the backend, so the grid uses tints for now).
+const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
 
 export default function HomeScreen() {
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners } = useBannersQuery();
+  const { data: categories } = useCategoriesQuery();
 
-  const [activeCat, setActiveCat] = useState("All");
-  const [cart, setCart] = useState<Record<string, number>>(
-    Object.fromEntries(PRODUCTS.filter((p) => p.qty).map((p) => [p.id, p.qty as number])),
-  );
-  const [wishlist, setWishlist] = useState<Record<string, boolean>>(
-    Object.fromEntries(PRODUCTS.filter((p) => p.wishlisted).map((p) => [p.id, true])),
-  );
+  // null = "All"; otherwise a category id used to filter the product query.
+  const [activeCatId, setActiveCatId] = useState<number | null>(null);
+  const catChips = [{ id: null as number | null, name: "All" }, ...(categories ?? [])];
 
-  const inc = (id: string) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
-  const dec = (id: string) =>
+  // Search box (debounced so we don't hit the API on every keystroke).
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(search.trim()), 350);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  // Search takes priority over the category filter while there's a query.
+  const productArg = query
+    ? { search: query }
+    : activeCatId
+      ? { category: activeCatId }
+      : undefined;
+  const { data: products, isFetching } = useProductsQuery(productArg);
+
+  const [cart, setCart] = useState<Record<number, number>>({});
+  const [wishlist, setWishlist] = useState<Record<number, boolean>>({});
+
+  const inc = (id: number) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
+  const dec = (id: number) =>
     setCart((c) => {
       const next = (c[id] || 0) - 1;
       const copy = { ...c };
@@ -56,7 +54,7 @@ export default function HomeScreen() {
       else copy[id] = next;
       return copy;
     });
-  const toggleWish = (id: string) => setWishlist((w) => ({ ...w, [id]: !w[id] }));
+  const toggleWish = (id: number) => setWishlist((w) => ({ ...w, [id]: !w[id] }));
 
   return (
     <Screen padded={false}>
@@ -77,7 +75,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.searchWrap}>
-            <SearchBar />
+            <SearchBar onChangeText={setSearch} />
           </View>
         </View>
 
@@ -104,91 +102,112 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
           >
-            {CATEGORIES.map((c) => {
-              const active = c === activeCat;
+            {catChips.map((c) => {
+              const active = c.id === activeCatId;
               return (
                 <Pressable
-                  key={c}
-                  onPress={() => setActiveCat(c)}
+                  key={c.id ?? "all"}
+                  onPress={() => setActiveCatId(c.id)}
                   style={[styles.chip, active && styles.chipActive]}
                 >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{c}</Text>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.name}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
 
-          {/* Popular products */}
-          <Text style={styles.sectionTitle}>Popular Products</Text>
-          <View style={styles.grid}>
-            {PRODUCTS.map((p) => {
-              const qty = cart[p.id] || 0;
-              const wished = !!wishlist[p.id];
-              return (
-                <View key={p.id} style={styles.card}>
-                  <View style={[styles.cardArt, { backgroundColor: p.tint }]}>
-                    {p.discount ? (
-                      <View style={styles.discount}>
-                        <Text style={styles.discountText}>{p.discount}% OFF</Text>
-                      </View>
-                    ) : null}
-                    <Pressable style={styles.heart} onPress={() => toggleWish(p.id)} hitSlop={8}>
-                      <Ionicons
-                        name={wished ? "heart" : "heart-outline"}
-                        size={16}
-                        color={wished ? BADGE_PINK : colors.muted}
-                      />
-                    </Pressable>
-                    <Text style={styles.artLabel}>product</Text>
-                  </View>
-
-                  <View style={styles.cardBody}>
-                    <Text style={styles.cardCat}>{p.category}</Text>
-                    <Text style={styles.cardName} numberOfLines={1}>
-                      {p.name}
-                    </Text>
-
-                    <View style={styles.ratingRow}>
-                      {p.rating ? (
-                        <>
-                          <Ionicons name="star" size={12} color={colors.yellow} />
-                          <Text style={styles.ratingText}>
-                            {p.rating.toFixed(1)} ({p.ratingCount})
-                          </Text>
-                        </>
+          {/* Popular products / search results */}
+          <Text style={styles.sectionTitle}>
+            {query ? `Results for “${query}”` : "Popular Products"}
+          </Text>
+          {!products && isFetching ? (
+            <ActivityIndicator color={colors.green} style={{ marginTop: spacing(3) }} />
+          ) : products && products.length === 0 ? (
+            <Text style={styles.empty}>
+              {query ? `No products match “${query}”.` : "No products in this category yet."}
+            </Text>
+          ) : (
+            <View style={[styles.grid, isFetching && styles.gridFetching]}>
+              {products?.map((p, i) => {
+                const v = p.default_variant;
+                const price = Number(v?.price ?? 0);
+                const mrp = Number(v?.mrp ?? 0);
+                const discount = v?.discount_percent ?? 0;
+                const qty = cart[p.id] || 0;
+                const wished = !!wishlist[p.id];
+                const img = imageUrl(p.image_url);
+                return (
+                  <View key={p.id} style={styles.card}>
+                    <View style={[styles.cardArt, { backgroundColor: TINTS[i % TINTS.length] }]}>
+                      {img ? (
+                        <Image source={{ uri: img }} style={styles.cardImg} resizeMode="contain" />
                       ) : (
-                        <Text style={styles.noRating}>No ratings yet</Text>
+                        <Text style={styles.artLabel}>product</Text>
                       )}
-                    </View>
-
-                    <View style={styles.priceRow}>
-                      <View style={styles.priceLeft}>
-                        <Text style={styles.price}>₹{p.price.toFixed(2)}</Text>
-                        {p.mrp ? <Text style={styles.mrp}>₹{p.mrp.toFixed(2)}</Text> : null}
-                      </View>
-
-                      {qty > 0 ? (
-                        <View style={styles.stepper}>
-                          <Pressable onPress={() => dec(p.id)} hitSlop={6} style={styles.stepBtn}>
-                            <Ionicons name="remove" size={16} color={colors.white} />
-                          </Pressable>
-                          <Text style={styles.stepQty}>{qty}</Text>
-                          <Pressable onPress={() => inc(p.id)} hitSlop={6} style={styles.stepBtn}>
-                            <Ionicons name="add" size={16} color={colors.white} />
-                          </Pressable>
+                      {discount > 0 ? (
+                        <View style={styles.discount}>
+                          <Text style={styles.discountText}>{Math.round(discount)}% OFF</Text>
                         </View>
-                      ) : (
-                        <Pressable onPress={() => inc(p.id)} style={styles.addBtn}>
-                          <Ionicons name="add" size={14} color={colors.green} />
-                          <Text style={styles.addText}>Add</Text>
-                        </Pressable>
-                      )}
+                      ) : null}
+                      <Pressable style={styles.heart} onPress={() => toggleWish(p.id)} hitSlop={8}>
+                        <Ionicons
+                          name={wished ? "heart" : "heart-outline"}
+                          size={16}
+                          color={wished ? BADGE_PINK : colors.muted}
+                        />
+                      </Pressable>
+                    </View>
+
+                    <View style={styles.cardBody}>
+                      <Text style={styles.cardCat} numberOfLines={1}>
+                        {p.category_name}
+                      </Text>
+                      <Text style={styles.cardName} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+
+                      <View style={styles.ratingRow}>
+                        {p.rating_count > 0 ? (
+                          <>
+                            <Ionicons name="star" size={12} color={colors.yellow} />
+                            <Text style={styles.ratingText}>
+                              {p.rating_average.toFixed(1)} ({p.rating_count})
+                            </Text>
+                          </>
+                        ) : (
+                          <Text style={styles.noRating}>No ratings yet</Text>
+                        )}
+                      </View>
+
+                      <View style={styles.priceRow}>
+                        <View style={styles.priceLeft}>
+                          <Text style={styles.price}>₹{price.toFixed(2)}</Text>
+                          {mrp > price ? <Text style={styles.mrp}>₹{mrp.toFixed(2)}</Text> : null}
+                        </View>
+
+                        {qty > 0 ? (
+                          <View style={styles.stepper}>
+                            <Pressable onPress={() => dec(p.id)} hitSlop={6} style={styles.stepBtn}>
+                              <Ionicons name="remove" size={16} color={colors.white} />
+                            </Pressable>
+                            <Text style={styles.stepQty}>{qty}</Text>
+                            <Pressable onPress={() => inc(p.id)} hitSlop={6} style={styles.stepBtn}>
+                              <Ionicons name="add" size={16} color={colors.white} />
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <Pressable onPress={() => inc(p.id)} style={styles.addBtn}>
+                            <Ionicons name="add" size={14} color={colors.green} />
+                            <Text style={styles.addText}>Add</Text>
+                          </Pressable>
+                        )}
+                      </View>
                     </View>
                   </View>
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       </ScrollView>
     </Screen>
@@ -276,6 +295,8 @@ const styles = StyleSheet.create({
 
   // Product grid
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  gridFetching: { opacity: 0.5 },
+  empty: { fontFamily: fontsAlt.regular, fontSize: 14, color: colors.muted, marginTop: spacing(2) },
   card: {
     width: "48.5%",
     backgroundColor: colors.white,
@@ -286,6 +307,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardArt: { height: 104, alignItems: "center", justifyContent: "center" },
+  cardImg: { width: "100%", height: "100%" },
   artLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(37,61,78,0.35)" },
   discount: {
     position: "absolute",
