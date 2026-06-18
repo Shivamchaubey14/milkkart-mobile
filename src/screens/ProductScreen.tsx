@@ -22,7 +22,7 @@ import {
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
-import type { HomeStackParamList } from "../navigation/HomeStack";
+import type { RootStackParamList } from "../navigation/RootNavigator";
 import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -44,7 +44,7 @@ function Stars({ value, size = 13 }: { value: number; size?: number }) {
 }
 
 export default function ProductScreen() {
-  const { slug } = useRoute<RouteProp<HomeStackParamList, "Product">>().params;
+  const { slug } = useRoute<RouteProp<RootStackParamList, "Product">>().params;
   const toast = useToast();
   const user = useAppSelector((s) => s.auth.user);
 
@@ -107,10 +107,11 @@ export default function ProductScreen() {
     <Screen padded={false}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
       <ScrollView
         ref={scrollRef}
+        style={styles.flex}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}

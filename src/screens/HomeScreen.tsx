@@ -9,7 +9,7 @@ import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
-import type { HomeStackParamList } from "../navigation/HomeStack";
+import type { RootStackParamList } from "../navigation/RootNavigator";
 import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -20,7 +20,7 @@ const BADGE_PINK = "#ff6b81";
 const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
 
 export default function HomeScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners } = useBannersQuery();
