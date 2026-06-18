@@ -163,6 +163,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(2.5),
     paddingTop: spacing(2.5),
     paddingBottom: spacing(3),
+    minHeight: 150,
     overflow: "hidden",
   },
   blob: {

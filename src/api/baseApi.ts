@@ -146,6 +146,10 @@ export const api = createApi({
       transformResponse: (r: Address[] | Paginated<Address>) => (Array.isArray(r) ? r : r.results),
       providesTags: ["Address"],
     }),
+    createAddress: build.mutation<Address, Partial<Address>>({
+      query: (body) => ({ url: "/addresses/", method: "POST", body }),
+      invalidatesTags: ["Address"],
+    }),
   }),
 });
 
@@ -158,4 +162,5 @@ export const {
   useCategoriesQuery,
   useProductsQuery,
   useAddressesQuery,
+  useCreateAddressMutation,
 } = api;
