@@ -29,6 +29,28 @@ export type Category = {
   product_count: number;
 };
 
+export type Variant = {
+  id: number;
+  label: string;
+  price: string;
+  mrp: string;
+  discount_percent: number;
+  in_stock: boolean;
+};
+
+export type CatalogProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  brand: string;
+  image_url: string;
+  category: number;
+  category_name: string;
+  default_variant: Variant | null;
+  rating_average: number;
+  rating_count: number;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -97,6 +119,10 @@ export const api = createApi({
       query: () => "/categories/",
       transformResponse: (r: Paginated<Category>) => r.results,
     }),
+    products: build.query<CatalogProduct[], { category?: number } | void>({
+      query: (arg) => (arg && arg.category ? `/products/?category=${arg.category}` : "/products/"),
+      transformResponse: (r: Paginated<CatalogProduct>) => r.results,
+    }),
   }),
 });
 
@@ -107,4 +133,5 @@ export const {
   useLazyMeQuery,
   useBannersQuery,
   useCategoriesQuery,
+  useProductsQuery,
 } = api;
