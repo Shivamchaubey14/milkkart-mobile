@@ -1,14 +1,24 @@
+import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-import { Address, useAddressesQuery } from "../api/baseApi";
+import { Address, useAddressesQuery, useUpdateMeMutation } from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
-import { useAppSelector } from "../store/hooks";
-import { colors, fonts, fontsAlt, spacing } from "../theme";
+import { setUser } from "../store/authSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -51,10 +61,34 @@ function DetailRow({
 export default function AccountScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
+  const dispatch = useAppDispatch();
   const toast = useToast();
   const { data: addresses, isLoading } = useAddressesQuery();
+  const [updateMe, { isLoading: saving }] = useUpdateMeMutation();
 
   const soon = (what: string) => () => toast(`${what} — coming soon.`);
+
+  // Inline edit of personal details.
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+
+  function startEdit() {
+    setName(user?.name || "");
+    setEmail(user?.email || "");
+    setEditing(true);
+  }
+
+  async function saveDetails() {
+    try {
+      const updated = await updateMe({ name: name.trim(), email: email.trim() }).unwrap();
+      dispatch(setUser(updated));
+      setEditing(false);
+      toast("Profile updated.");
+    } catch {
+      toast("Couldn't update profile. Please try again.", "error");
+    }
+  }
 
   return (
     <Screen padded={false}>
@@ -70,25 +104,75 @@ export default function AccountScreen() {
           {/* Personal details */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionLabel}>PERSONAL DETAILS</Text>
-            <Pressable hitSlop={8} onPress={soon("Edit details")}>
-              <Text style={styles.editLink}>Edit</Text>
-            </Pressable>
+            {!editing ? (
+              <Pressable style={styles.editPillHeader} hitSlop={8} onPress={startEdit}>
+                <Ionicons name="pencil" size={13} color={colors.green} />
+                <Text style={styles.editPillText}>Edit</Text>
+              </Pressable>
+            ) : null}
           </View>
           <View style={styles.card}>
-            <DetailRow icon="person-outline" label="Name" value={user?.name || "—"} />
-            <View style={styles.hr} />
-            <DetailRow
-              icon="call-outline"
-              label="Mobile Number"
-              value={user?.phone || "—"}
-              right={
-                <View style={styles.verified}>
-                  <Text style={styles.verifiedText}>Verified</Text>
+            {editing ? (
+              <>
+                <Text style={styles.editLabel}>Name</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Your name"
+                  placeholderTextColor={colors.muted}
+                />
+
+                <Text style={styles.editLabel}>Mobile Number</Text>
+                <View style={styles.readonlyRow}>
+                  <Text style={styles.readonlyText}>{user?.phone || "—"}</Text>
+                  <View style={styles.verified}>
+                    <Text style={styles.verifiedText}>Verified</Text>
+                  </View>
                 </View>
-              }
-            />
-            <View style={styles.hr} />
-            <DetailRow icon="mail-outline" label="Email" value={user?.email || "Add email"} link />
+
+                <Text style={styles.editLabel}>Email</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+
+                <View style={styles.editActions}>
+                  <Pressable style={styles.cancelPill} onPress={() => setEditing(false)} disabled={saving}>
+                    <Text style={styles.cancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable style={styles.savePill} onPress={saveDetails} disabled={saving}>
+                    {saving ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.saveText}>Save</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <DetailRow icon="person-outline" label="Name" value={user?.name || "—"} />
+                <View style={styles.hr} />
+                <DetailRow
+                  icon="call-outline"
+                  label="Mobile Number"
+                  value={user?.phone || "—"}
+                  right={
+                    <View style={styles.verified}>
+                      <Text style={styles.verifiedText}>Verified</Text>
+                    </View>
+                  }
+                />
+                <View style={styles.hr} />
+                <DetailRow icon="mail-outline" label="Email" value={user?.email || "Add email"} link />
+              </>
+            )}
           </View>
 
           {/* Saved addresses */}
@@ -98,12 +182,14 @@ export default function AccountScreen() {
             <ActivityIndicator color={colors.green} style={{ marginTop: spacing(2) }} />
           ) : (
             (addresses ?? []).map((a) => (
-              <View key={a.id} style={styles.card}>
+              <View key={a.id} style={styles.addrCard}>
                 <View style={styles.addrTop}>
-                  <View style={styles.detailIcon}>
+                  <View style={styles.addrIcon}>
                     <Ionicons name="home-outline" size={18} color={colors.green} />
                   </View>
-                  <Text style={styles.addrLabel}>{a.label || "Address"}</Text>
+                  <Text style={styles.addrLabel}>
+                    {a.label ? a.label[0].toUpperCase() + a.label.slice(1) : "Address"}
+                  </Text>
                   {a.is_default ? (
                     <View style={styles.defaultBadge}>
                       <Text style={styles.defaultText}>DEFAULT</Text>
@@ -111,13 +197,13 @@ export default function AccountScreen() {
                   ) : null}
                 </View>
                 <Text style={styles.addrText}>{formatAddress(a)}</Text>
-                <View style={styles.hr} />
+                <View style={styles.addrHr} />
                 <View style={styles.addrActions}>
-                  <Pressable style={styles.action} hitSlop={6} onPress={soon("Edit address")}>
+                  <Pressable style={styles.editPill} hitSlop={6} onPress={soon("Edit address")}>
                     <Ionicons name="pencil-outline" size={15} color={colors.green} />
                     <Text style={styles.actionGreen}>Edit</Text>
                   </Pressable>
-                  <Pressable style={styles.action} hitSlop={6} onPress={soon("Delete address")}>
+                  <Pressable style={styles.deletePill} hitSlop={6} onPress={soon("Delete address")}>
                     <Ionicons name="trash-outline" size={15} color={colors.error} />
                     <Text style={styles.actionRed}>Delete</Text>
                   </Pressable>
@@ -170,8 +256,68 @@ const styles = StyleSheet.create({
   // Section headers
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionLabel: { fontFamily: fontsAlt.extrabold, fontSize: 12, letterSpacing: 1, color: colors.muted },
-  editLink: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
+  // Pill "Edit" button with pencil icon for Personal Details.
+  editPillHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.greenTint,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  editPillText: { fontFamily: fonts.bold, fontSize: 13, color: colors.green },
   addrHead: { marginTop: spacing(3) },
+
+  // Inline edit form (Personal Details)
+  editLabel: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    color: colors.green,
+    marginTop: spacing(1.25),
+    marginBottom: 6,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    backgroundColor: colors.bg,
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: spacing(1.25),
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.heading,
+  },
+  readonlyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.bgSoft,
+    borderRadius: 12,
+    paddingHorizontal: spacing(1.5),
+    paddingVertical: spacing(1.25),
+  },
+  readonlyText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.heading },
+  editActions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing(1.25), marginTop: spacing(2) },
+  cancelPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.bg,
+    paddingVertical: 9,
+    paddingHorizontal: 20,
+  },
+  cancelText: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
+  savePill: {
+    borderRadius: 999,
+    backgroundColor: colors.green,
+    paddingVertical: 9,
+    paddingHorizontal: 24,
+    minWidth: 84,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
 
   // Cards
   card: {
@@ -206,11 +352,25 @@ const styles = StyleSheet.create({
   },
   verifiedText: { fontFamily: fonts.bold, fontSize: 11, color: colors.green },
 
-  // Address
+  // Address — Cream Yolk 400 card.
+  addrCard: {
+    backgroundColor: palette.yellow[300],
+    borderRadius: 16,
+    padding: spacing(1.75),
+    marginTop: spacing(1.5),
+  },
   addrTop: { flexDirection: "row", alignItems: "center" },
+  addrIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   addrLabel: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading, marginLeft: spacing(1.5) },
   defaultBadge: {
-    backgroundColor: colors.greenTint,
+    backgroundColor: colors.white,
     borderRadius: 6,
     paddingVertical: 2,
     paddingHorizontal: 7,
@@ -220,12 +380,31 @@ const styles = StyleSheet.create({
   addrText: {
     fontFamily: fontsAlt.regular,
     fontSize: 13,
-    color: colors.text,
+    color: colors.heading,
     lineHeight: 19,
     marginTop: spacing(1.25),
   },
-  addrActions: { flexDirection: "row", gap: spacing(3) },
-  action: { flexDirection: "row", alignItems: "center", gap: 5 },
+  addrHr: { height: 1, backgroundColor: "rgba(37,61,78,0.14)", marginVertical: spacing(1.25) },
+  addrActions: { flexDirection: "row", gap: spacing(1.5) },
+  // Pill-shaped action buttons on the yellow card.
+  editPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.white,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  deletePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.errorTint,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
   actionGreen: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
   actionRed: { fontFamily: fonts.bold, fontSize: 14, color: colors.error },
 
