@@ -16,6 +16,7 @@ import {
   NunitoSans_800ExtraBold,
 } from "@expo-google-fonts/nunito-sans";
 
+import { ToastProvider } from "./src/components/Toast";
 import RootNavigator from "./src/navigation/RootNavigator";
 import SplashScreen from "./src/screens/SplashScreen";
 import { store } from "./src/store";
@@ -57,7 +58,9 @@ export default function App() {
     <Provider store={store}>
       <SafeAreaProvider>
         <StatusBar style="dark" />
-        <Boot />
+        <ToastProvider>
+          <Boot />
+        </ToastProvider>
       </SafeAreaProvider>
     </Provider>
   );

@@ -1,28 +1,53 @@
+import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Text } from "react-native";
 
 import HomeScreen from "../screens/HomeScreen";
+import PlaceholderScreen from "../screens/PlaceholderScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import { colors } from "../theme";
+import { colors, fonts } from "../theme";
 
 const Tab = createBottomTabNavigator();
 
-// Emoji tab icons for now; swapped for vector icons when we add the icon set.
-const icon = (glyph: string) => ({ color }: { color: string }) =>
-  <Text style={{ fontSize: 20, color }}>{glyph}</Text>;
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+// Maps each tab to its outline (inactive) and filled (active) Ionicon.
+const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
+  Home: ["home-outline", "home"],
+  Alerts: ["notifications-outline", "notifications"],
+  Wishlist: ["heart-outline", "heart"],
+  Cart: ["cart-outline", "cart"],
+  Profile: ["person-outline", "person"],
+};
+
+const AlertsScreen = () => <PlaceholderScreen title="Alerts" icon="notifications-outline" />;
+const WishlistScreen = () => <PlaceholderScreen title="Wishlist" icon="heart-outline" />;
+const CartScreen = () => <PlaceholderScreen title="Cart" icon="cart-outline" />;
 
 export default function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.green,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { height: 58, paddingBottom: 8, paddingTop: 6 },
-      }}
+        tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11 },
+        tabBarStyle: {
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 8,
+          borderTopColor: colors.line,
+        },
+        tabBarIcon: ({ focused, color, size }) => {
+          const [outline, filled] = TAB_ICONS[route.name] ?? ["ellipse-outline", "ellipse"];
+          return <Ionicons name={focused ? filled : outline} size={size ?? 22} color={color} />;
+        },
+      })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: icon("🏠") }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: icon("👤") }} />
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Alerts" component={AlertsScreen} />
+      <Tab.Screen name="Wishlist" component={WishlistScreen} />
+      <Tab.Screen name="Cart" component={CartScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
