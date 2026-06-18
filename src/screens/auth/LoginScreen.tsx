@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,7 +14,7 @@ import { useLazyMeQuery, useSendOtpMutation, useVerifyOtpMutation } from "../../
 import { Button } from "../../components/Button";
 import { BrandLogo } from "../../components/Logo";
 import { Screen } from "../../components/Screen";
-import { TextField } from "../../components/TextField";
+import { useToast } from "../../components/Toast";
 import { useAppDispatch } from "../../store/hooks";
 import { setTokens, setUser } from "../../store/authSlice";
 import { saveTokens } from "../../store/secureTokens";
@@ -33,6 +34,7 @@ export default function LoginScreen() {
   const [verifyOtp, { isLoading: verifying }] = useVerifyOtpMutation();
   const [fetchMe] = useLazyMeQuery();
   const dispatch = useAppDispatch();
+  const toast = useToast();
 
   // The field holds the 10-digit national number; the backend wants E.164.
   const fullPhone = `+91${phone.trim()}`;
@@ -46,6 +48,7 @@ export default function LoginScreen() {
     try {
       await sendOtp({ phone: fullPhone }).unwrap();
       setStep("otp");
+      toast("OTP Sent! Check your inbox — we've also sent it to your email too.");
     } catch (e) {
       setError(apiError(e));
     }
@@ -110,9 +113,8 @@ export default function LoginScreen() {
                 <Text style={styles.label}>Phone number</Text>
                 <View style={styles.phoneRow}>
                   <View style={styles.country}>
-                    <Text style={styles.flag}>🇮🇳</Text>
                     <Text style={styles.code}>+91</Text>
-                    <Text style={styles.caret}>▾</Text>
+                    <Ionicons name="chevron-down" size={14} color={colors.muted} style={styles.caret} />
                   </View>
                   <View style={styles.divider} />
                   <TextInput
@@ -133,18 +135,23 @@ export default function LoginScreen() {
               </>
             ) : (
               <>
-                <TextField
-                  label="Enter the 6-digit code"
-                  value={code}
-                  onChangeText={setCode}
-                  placeholder="● ● ● ● ● ●"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  autoFocus
-                />
+                <Text style={styles.label}>Enter the 6-digit code</Text>
+                <View style={styles.codeRow}>
+                  <TextInput
+                    style={styles.codeInput}
+                    value={code}
+                    onChangeText={(t) => setCode(t.replace(/[^0-9]/g, "").slice(0, 6))}
+                    placeholder="••••••"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    textAlign="center"
+                    autoFocus
+                  />
+                </View>
                 {error ? <Text style={styles.error}>{error}</Text> : null}
                 <Button
-                  title="Verify & continue"
+                  title="Verify & Continue"
                   onPress={onVerify}
                   loading={verifying}
                   style={styles.cta}
@@ -157,7 +164,7 @@ export default function LoginScreen() {
                     setCode("");
                     setError("");
                   }}
-                  style={{ marginTop: spacing(0.5) }}
+                  style={{ marginTop: spacing(1) }}
                 />
                 <Text style={styles.helper}>
                   Your one-time code is emailed to you. In dev it's also printed in the backend logs.
@@ -246,9 +253,8 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   country: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing(1) },
-  flag: { fontSize: 18, marginRight: 6 },
   code: { fontFamily: fonts.semibold, fontSize: font.body, color: colors.heading },
-  caret: { fontSize: 10, color: colors.muted, marginLeft: 4 },
+  caret: { marginLeft: 4 },
   divider: { width: 1, height: 26, backgroundColor: colors.line, marginHorizontal: spacing(0.5) },
   phoneInput: {
     flex: 1,
@@ -258,6 +264,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
     paddingHorizontal: spacing(1),
     letterSpacing: 0.5,
+  },
+  // OTP code field — same green-bordered look as the phone field, centered.
+  codeRow: {
+    borderWidth: 1.5,
+    borderColor: colors.green,
+    borderRadius: 14,
+    backgroundColor: colors.bg,
+    minHeight: 56,
+    justifyContent: "center",
+  },
+  codeInput: {
+    fontFamily: fonts.bold,
+    fontSize: 22,
+    color: colors.heading,
+    letterSpacing: 8,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(1),
   },
   helper: {
     fontFamily: fontsAlt.regular,

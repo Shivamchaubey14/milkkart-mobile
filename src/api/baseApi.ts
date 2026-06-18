@@ -11,6 +11,15 @@ import { logout, setTokens, User } from "../store/authSlice";
 import { clearTokens, saveAccess } from "../store/secureTokens";
 import { API_BASE } from "./config";
 
+export type Banner = {
+  id: number;
+  title: string;
+  subtitle: string;
+  image_url: string;
+  link_url: string;
+  bg_color: string;
+};
+
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: API_BASE,
   prepareHeaders: (headers, { getState }) => {
@@ -70,7 +79,16 @@ export const api = createApi({
       query: () => "/auth/me/",
       providesTags: ["Me"],
     }),
+    banners: build.query<Banner[], void>({
+      query: () => "/banners/",
+    }),
   }),
 });
 
-export const { useSendOtpMutation, useVerifyOtpMutation, useMeQuery, useLazyMeQuery } = api;
+export const {
+  useSendOtpMutation,
+  useVerifyOtpMutation,
+  useMeQuery,
+  useLazyMeQuery,
+  useBannersQuery,
+} = api;

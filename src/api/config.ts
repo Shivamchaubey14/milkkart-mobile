@@ -11,4 +11,4 @@
 //   • iOS simulator    → http://localhost:8000/api/v1
 //   • Physical phone   → http://<your-LAN-IP>:8000/api/v1
 // ───────────────────────────────────────────────────────────────────────────
-export const API_BASE = "http://10.85.252.42:8000/api/v1";
+export const API_BASE = "http://192.168.71.160:8000/api/v1";
