@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,10 +12,11 @@ import {
   View,
 } from "react-native";
 
-import { useCreateAddressMutation } from "../api/baseApi";
+import { useCreateAddressMutation, useUpdateAddressMutation } from "../api/baseApi";
 import { Button } from "../components/Button";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -45,16 +46,23 @@ function Field({
 
 export default function AddAddressScreen() {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<ProfileStackParamList, "AddAddress">>();
+  const existing = route.params?.address;
+  const isEdit = !!existing;
   const toast = useToast();
-  const [createAddress, { isLoading }] = useCreateAddressMutation();
+  const [createAddress, { isLoading: creating }] = useCreateAddressMutation();
+  const [updateAddress, { isLoading: updating }] = useUpdateAddressMutation();
+  const isLoading = creating || updating;
 
-  const [type, setType] = useState("home");
-  const [flat, setFlat] = useState("");
+  // In edit mode the stored address_line goes into the first field (we can't
+  // reliably split it back into flat/street).
+  const [type, setType] = useState(existing?.label || "home");
+  const [flat, setFlat] = useState(existing?.address_line || "");
   const [street, setStreet] = useState("");
-  const [landmark, setLandmark] = useState("");
-  const [city, setCity] = useState("");
-  const [stateName, setStateName] = useState("");
-  const [pincode, setPincode] = useState("");
+  const [landmark, setLandmark] = useState(existing?.landmark || "");
+  const [city, setCity] = useState(existing?.city || "");
+  const [stateName, setStateName] = useState(existing?.state || "");
+  const [pincode, setPincode] = useState(existing?.pincode || "");
   const [error, setError] = useState("");
 
   const active = TYPES.find((t) => t.value === type);
@@ -66,16 +74,22 @@ export default function AddAddressScreen() {
       setError("Fill in the flat/street, city, state and a 6-digit pincode.");
       return;
     }
+    const body = {
+      label: type,
+      address_line: addressLine,
+      landmark: landmark.trim(),
+      city: city.trim(),
+      state: stateName.trim(),
+      pincode: pincode.trim(),
+    };
     try {
-      await createAddress({
-        label: type,
-        address_line: addressLine,
-        landmark: landmark.trim(),
-        city: city.trim(),
-        state: stateName.trim(),
-        pincode: pincode.trim(),
-      }).unwrap();
-      toast("Address added.");
+      if (isEdit) {
+        await updateAddress({ id: existing.id, ...body }).unwrap();
+        toast("Address updated.");
+      } else {
+        await createAddress(body).unwrap();
+        toast("Address added.");
+      }
       navigation.goBack();
     } catch {
       setError("Couldn't save the address. Please try again.");
@@ -96,8 +110,10 @@ export default function AddAddressScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.blob} />
-            <Text style={styles.headerTitle}>Add Address</Text>
-            <Text style={styles.headerSub}>Where should we deliver?</Text>
+            <Text style={styles.headerTitle}>{isEdit ? "Edit Address" : "Add Address"}</Text>
+            <Text style={styles.headerSub}>
+              {isEdit ? "Update your delivery details" : "Where should we deliver?"}
+            </Text>
           </View>
 
           <View style={styles.body}>
@@ -163,7 +179,12 @@ export default function AddAddressScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <Button title="Add Address" onPress={onSubmit} loading={isLoading} style={{ marginTop: spacing(1) }} />
+            <Button
+              title={isEdit ? "Save Changes" : "Add Address"}
+              onPress={onSubmit}
+              loading={isLoading}
+              style={{ marginTop: spacing(1) }}
+            />
             <Button
               title="Cancel"
               variant="outline"

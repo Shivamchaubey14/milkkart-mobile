@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +13,12 @@ import {
   View,
 } from "react-native";
 
-import { Address, useAddressesQuery, useUpdateMeMutation } from "../api/baseApi";
+import {
+  Address,
+  useAddressesQuery,
+  useDeleteAddressMutation,
+  useUpdateMeMutation,
+} from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
@@ -65,8 +71,26 @@ export default function AccountScreen() {
   const toast = useToast();
   const { data: addresses, isLoading } = useAddressesQuery();
   const [updateMe, { isLoading: saving }] = useUpdateMeMutation();
+  const [deleteAddress] = useDeleteAddressMutation();
 
-  const soon = (what: string) => () => toast(`${what} — coming soon.`);
+  function confirmDelete(a: Address) {
+    const name = a.label ? a.label[0].toUpperCase() + a.label.slice(1) : "this address";
+    Alert.alert("Delete address", `Remove "${name}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteAddress(a.id).unwrap();
+            toast("Address deleted.");
+          } catch {
+            toast("Couldn't delete the address. Please try again.", "error");
+          }
+        },
+      },
+    ]);
+  }
 
   // Inline edit of personal details.
   const [editing, setEditing] = useState(false);
@@ -199,11 +223,15 @@ export default function AccountScreen() {
                 <Text style={styles.addrText}>{formatAddress(a)}</Text>
                 <View style={styles.addrHr} />
                 <View style={styles.addrActions}>
-                  <Pressable style={styles.editPill} hitSlop={6} onPress={soon("Edit address")}>
+                  <Pressable
+                    style={styles.editPill}
+                    hitSlop={6}
+                    onPress={() => navigation.navigate("AddAddress", { address: a })}
+                  >
                     <Ionicons name="pencil-outline" size={15} color={colors.green} />
                     <Text style={styles.actionGreen}>Edit</Text>
                   </Pressable>
-                  <Pressable style={styles.deletePill} hitSlop={6} onPress={soon("Delete address")}>
+                  <Pressable style={styles.deletePill} hitSlop={6} onPress={() => confirmDelete(a)}>
                     <Ionicons name="trash-outline" size={15} color={colors.error} />
                     <Text style={styles.actionRed}>Delete</Text>
                   </Pressable>
