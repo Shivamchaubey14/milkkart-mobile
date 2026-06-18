@@ -6,7 +6,7 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { colors, font, radius, spacing } from "../theme";
+import { colors, font, fonts, radius, spacing } from "../theme";
 
 type Variant = "primary" | "outline" | "ghost";
 
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   ghost: { backgroundColor: "transparent" },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.85 },
-  label: { fontSize: font.body, fontWeight: "700" },
+  label: { fontSize: font.body, fontFamily: fonts.bold },
   labelPrimary: { color: colors.white },
   labelGreen: { color: colors.green },
 });

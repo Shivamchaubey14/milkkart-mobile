@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#def9ec"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "in.milkkart.app"
@@ -19,6 +21,9 @@
     "android": {
       "package": "in.milkkart.app"
     },
-    "plugins": ["expo-secure-store"]
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ]
   }
 }
