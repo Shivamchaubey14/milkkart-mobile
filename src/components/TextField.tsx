@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 
-import { colors, font, radius, spacing } from "../theme";
+import { colors, font, fonts, radius, spacing } from "../theme";
 
 export function TextField({
   label,
@@ -37,7 +37,7 @@ export function TextField({
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: spacing(1.5) },
-  label: { fontSize: font.small, fontWeight: "600", color: colors.text, marginBottom: spacing(0.75) },
+  label: { fontSize: font.small, fontFamily: fonts.semibold, color: colors.text, marginBottom: spacing(0.75) },
   input: {
     borderWidth: 2,
     borderColor: colors.line,
@@ -45,6 +45,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(1.75),
     paddingVertical: spacing(1.5),
     fontSize: font.body,
+    fontFamily: fonts.medium,
     color: colors.heading,
     backgroundColor: colors.bg,
   },
