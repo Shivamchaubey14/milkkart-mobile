@@ -125,6 +125,10 @@ export const api = createApi({
       query: () => "/auth/me/",
       providesTags: ["Me"],
     }),
+    updateMe: build.mutation<User, { name?: string; email?: string }>({
+      query: (body) => ({ url: "/auth/me/", method: "PATCH", body }),
+      invalidatesTags: ["Me"],
+    }),
     banners: build.query<Banner[], void>({
       query: () => "/banners/",
     }),
@@ -158,6 +162,7 @@ export const {
   useVerifyOtpMutation,
   useMeQuery,
   useLazyMeQuery,
+  useUpdateMeMutation,
   useBannersQuery,
   useCategoriesQuery,
   useProductsQuery,
