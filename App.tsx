@@ -16,11 +16,12 @@ import {
   NunitoSans_800ExtraBold,
 } from "@expo-google-fonts/nunito-sans";
 
+import { api } from "./src/api/baseApi";
 import { ToastProvider } from "./src/components/Toast";
 import RootNavigator from "./src/navigation/RootNavigator";
 import SplashScreen from "./src/screens/SplashScreen";
 import { store } from "./src/store";
-import { bootstrapped } from "./src/store/authSlice";
+import { bootstrapped, setUser } from "./src/store/authSlice";
 import { loadTokens } from "./src/store/secureTokens";
 
 // Loads any saved tokens from secure storage before showing the app, so a
@@ -42,6 +43,17 @@ function Boot() {
       const { access, refresh } = await loadTokens();
       store.dispatch(bootstrapped({ access, refresh }));
       setReady(true);
+      // A returning user skips the login screen (which is what fetches the
+      // profile), so load it here too — otherwise `user` stays null and the
+      // name/email/avatar render blank until the next login.
+      if (access) {
+        try {
+          const me = await store.dispatch(api.endpoints.me.initiate()).unwrap();
+          store.dispatch(setUser(me));
+        } catch {
+          /* best-effort — the app still works without the cached profile */
+        }
+      }
     })();
   }, []);
 
