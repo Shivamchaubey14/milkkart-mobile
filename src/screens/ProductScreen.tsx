@@ -15,6 +15,7 @@ import {
 } from "react-native";
 
 import {
+  useAddToCartMutation,
   useProductDetailQuery,
   useProductRatingsQuery,
   useSubmitProductRatingMutation,
@@ -23,8 +24,7 @@ import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { addItem } from "../store/cartSlice";
-import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const BADGE_PINK = "#ff6b81";
@@ -47,7 +47,7 @@ function Stars({ value, size = 13 }: { value: number; size?: number }) {
 export default function ProductScreen() {
   const { slug } = useRoute<RouteProp<RootStackParamList, "Product">>().params;
   const toast = useToast();
-  const dispatch = useAppDispatch();
+  const [addToCart] = useAddToCartMutation();
   const user = useAppSelector((s) => s.auth.user);
 
   const { data: product, isLoading } = useProductDetailQuery(slug);
@@ -189,18 +189,14 @@ export default function ProductScreen() {
           {/* Actions — full-width Add to cart (no heart), then Subscribe & save */}
           <Pressable
             style={styles.addBtn}
-            onPress={() => {
-              dispatch(
-                addItem({
-                  id: product.id,
-                  name: product.name,
-                  variantLabel: variant?.label ?? "",
-                  price,
-                  image: product.image_url,
-                  slug: product.slug,
-                }),
-              );
-              toast("Added to cart.");
+            onPress={async () => {
+              if (!variant) return;
+              try {
+                await addToCart({ variant_id: variant.id }).unwrap();
+                toast("Added to cart.");
+              } catch {
+                toast("Couldn't add to cart.", "error");
+              }
             }}
           >
             <Ionicons name="cart-outline" size={18} color={colors.white} />

@@ -4,14 +4,23 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { CatalogProduct, useBannersQuery, useCategoriesQuery, useProductsQuery } from "../api/baseApi";
+import {
+  CatalogProduct,
+  useAddToCartMutation,
+  useBannersQuery,
+  useCartQuery,
+  useCategoriesQuery,
+  useProductsQuery,
+  useRemoveCartItemMutation,
+  useUpdateCartItemMutation,
+} from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
+import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { addItem, removeItem } from "../store/cartSlice";
-import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const BADGE_PINK = "#ff6b81";
@@ -47,22 +56,32 @@ export default function HomeScreen() {
       : undefined;
   const { data: products, isFetching } = useProductsQuery(productArg);
 
-  const dispatch = useAppDispatch();
-  const cart = useAppSelector((s) => s.cart.items);
+  const toast = useToast();
+  const { data: cart } = useCartQuery();
+  const [addToCart] = useAddToCartMutation();
+  const [updateCartItem] = useUpdateCartItemMutation();
+  const [removeCartItem] = useRemoveCartItemMutation();
   const [wishlist, setWishlist] = useState<Record<number, boolean>>({});
 
-  const add = (p: CatalogProduct) =>
-    dispatch(
-      addItem({
-        id: p.id,
-        name: p.name,
-        variantLabel: p.default_variant?.label ?? "",
-        price: Number(p.default_variant?.price ?? 0),
-        image: p.image_url,
-        slug: p.slug,
-      }),
-    );
-  const dec = (id: number) => dispatch(removeItem(id));
+  // Cart line for a product, keyed by its default variant id.
+  const lineFor = (p: CatalogProduct) =>
+    cart?.items.find((it) => it.variant === p.default_variant?.id);
+
+  async function add(p: CatalogProduct) {
+    const variantId = p.default_variant?.id;
+    if (!variantId) return;
+    try {
+      await addToCart({ variant_id: variantId }).unwrap();
+    } catch {
+      toast("Couldn't add to cart.", "error");
+    }
+  }
+  async function dec(p: CatalogProduct) {
+    const line = lineFor(p);
+    if (!line) return;
+    if (line.quantity <= 1) removeCartItem(line.id);
+    else updateCartItem({ item_id: line.id, quantity: line.quantity - 1 });
+  }
   const toggleWish = (id: number) => setWishlist((w) => ({ ...w, [id]: !w[id] }));
 
   return (
@@ -142,7 +161,7 @@ export default function HomeScreen() {
                 const price = Number(v?.price ?? 0);
                 const mrp = Number(v?.mrp ?? 0);
                 const discount = v?.discount_percent ?? 0;
-                const qty = cart[p.id]?.qty || 0;
+                const qty = lineFor(p)?.quantity || 0;
                 const wished = !!wishlist[p.id];
                 const img = imageUrl(p.image_url);
                 return (
@@ -200,7 +219,7 @@ export default function HomeScreen() {
 
                         {qty > 0 ? (
                           <View style={styles.stepper}>
-                            <Pressable onPress={() => dec(p.id)} hitSlop={6} style={styles.stepBtn}>
+                            <Pressable onPress={() => dec(p)} hitSlop={6} style={styles.stepBtn}>
                               <Ionicons name="remove" size={16} color={colors.white} />
                             </Pressable>
                             <Text style={styles.stepQty}>{qty}</Text>
