@@ -43,6 +43,8 @@ export default function CartScreen() {
 
   const [code, setCode] = useState("");
 
+  const scrollRef = useRef<ScrollView>(null);
+
   // Gentle bounce for the "scroll for items" down-arrow hint.
   const bounce = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -119,7 +121,11 @@ export default function CartScreen() {
         ) : (
           <>
             {/* Header + product list scroll together. */}
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+              ref={scrollRef}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
               {header}
               <View style={styles.list}>
                 {lines.map((l, i) => (
@@ -141,7 +147,13 @@ export default function CartScreen() {
             {/* Fixed footer: coupon + bill details + checkout. */}
             <View style={styles.footer}>
               <Animated.View style={[styles.scrollHint, { transform: [{ translateY: bounce }] }]}>
-                <Ionicons name="chevron-down" size={18} color={colors.muted} />
+                <Pressable
+                  style={styles.scrollPill}
+                  onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                >
+                  <Text style={styles.scrollPillText}>Scroll down for more</Text>
+                  <Ionicons name="chevron-down" size={15} color={colors.error} />
+                </Pressable>
               </Animated.View>
 
               {cart?.coupon_code ? (
@@ -332,10 +344,8 @@ const styles = StyleSheet.create({
   // Footer
   footer: {
     paddingHorizontal: spacing(2.5),
-    paddingTop: spacing(1.5),
+    paddingTop: spacing(1),
     paddingBottom: spacing(1.5),
-    borderTopWidth: 1,
-    borderTopColor: colors.lineSoft,
     backgroundColor: colors.bg,
   },
   couponRow: { flexDirection: "row", gap: spacing(1) },
@@ -373,8 +383,18 @@ const styles = StyleSheet.create({
   couponAppliedText: { flex: 1, fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
   couponRemove: { fontFamily: fonts.bold, fontSize: 13, color: colors.error },
 
-  // Down-arrow hint that the list above scrolls.
-  scrollHint: { alignItems: "center", paddingBottom: spacing(0.5) },
+  // Bouncing pill hint that the list above scrolls.
+  scrollHint: { alignItems: "center", paddingBottom: spacing(1) },
+  scrollPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.errorTint,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
+  },
+  scrollPillText: { fontFamily: fonts.bold, fontSize: 12, color: colors.error },
 
   // Inline free-delivery highlight inside the bill card.
   freeRow: { backgroundColor: colors.greenTint, borderRadius: 8, paddingHorizontal: spacing(1), marginVertical: 1 },
