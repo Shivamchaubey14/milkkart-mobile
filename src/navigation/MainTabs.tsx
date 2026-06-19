@@ -1,12 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
+import { useCartQuery } from "../api/baseApi";
 import CartScreen from "../screens/CartScreen";
 import HomeScreen from "../screens/HomeScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
 import ProfileStack from "./ProfileStack";
-import { selectCartCount } from "../store/cartSlice";
-import { useAppSelector } from "../store/hooks";
 import { colors, fonts } from "../theme";
 
 const Tab = createBottomTabNavigator();
@@ -26,7 +25,8 @@ const AlertsScreen = () => <PlaceholderScreen title="Alerts" icon="notifications
 const WishlistScreen = () => <PlaceholderScreen title="Wishlist" icon="heart-outline" />;
 
 export default function MainTabs() {
-  const cartCount = useAppSelector((s) => selectCartCount(s.cart.items));
+  const { data: cart } = useCartQuery();
+  const cartCount = cart?.item_count ?? 0;
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({

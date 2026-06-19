@@ -89,6 +89,36 @@ export type Address = {
   is_default: boolean;
 };
 
+export type CartItem = {
+  id: number;
+  variant: number;
+  product_name: string;
+  product_slug: string;
+  image_url: string;
+  variant_label: string;
+  price: string;
+  quantity: number;
+  subtotal: string;
+};
+
+export type CartBill = {
+  subtotal: number | string;
+  coupon_code: string | null;
+  coupon_discount: number | string;
+  delivery_fee: number | string;
+  small_cart_fee: number | string;
+  tax: number | string;
+  grand_total: number | string;
+};
+
+export type Cart = {
+  id: number;
+  items: CartItem[];
+  coupon_code: string | null;
+  bill: CartBill;
+  item_count: number;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -135,7 +165,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating"],
+  tagTypes: ["Me", "Address", "Rating", "Cart"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -205,6 +235,34 @@ export const api = createApi({
       query: (id) => ({ url: `/addresses/${id}/`, method: "DELETE" }),
       invalidatesTags: ["Address"],
     }),
+    cart: build.query<Cart, void>({
+      query: () => "/cart/",
+      providesTags: ["Cart"],
+    }),
+    addToCart: build.mutation<Cart, { variant_id: number; quantity?: number }>({
+      query: (body) => ({ url: "/cart/add/", method: "POST", body }),
+      invalidatesTags: ["Cart"],
+    }),
+    updateCartItem: build.mutation<Cart, { item_id: number; quantity: number }>({
+      query: ({ item_id, quantity }) => ({
+        url: `/cart/items/${item_id}/`,
+        method: "PATCH",
+        body: { quantity },
+      }),
+      invalidatesTags: ["Cart"],
+    }),
+    removeCartItem: build.mutation<unknown, number>({
+      query: (item_id) => ({ url: `/cart/items/${item_id}/`, method: "DELETE" }),
+      invalidatesTags: ["Cart"],
+    }),
+    applyCoupon: build.mutation<Cart, string>({
+      query: (code) => ({ url: "/cart/apply-coupon/", method: "POST", body: { code } }),
+      invalidatesTags: ["Cart"],
+    }),
+    removeCoupon: build.mutation<Cart, void>({
+      query: () => ({ url: "/cart/remove-coupon/", method: "POST", body: {} }),
+      invalidatesTags: ["Cart"],
+    }),
   }),
 });
 
@@ -224,4 +282,10 @@ export const {
   useCreateAddressMutation,
   useUpdateAddressMutation,
   useDeleteAddressMutation,
+  useCartQuery,
+  useAddToCartMutation,
+  useUpdateCartItemMutation,
+  useRemoveCartItemMutation,
+  useApplyCouponMutation,
+  useRemoveCouponMutation,
 } = api;

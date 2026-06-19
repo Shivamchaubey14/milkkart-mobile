@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -10,43 +11,51 @@ import {
   View,
 } from "react-native";
 
+import {
+  CartItem,
+  useAddToCartMutation,
+  useApplyCouponMutation,
+  useCartQuery,
+  useRemoveCartItemMutation,
+  useRemoveCouponMutation,
+  useUpdateCartItemMutation,
+} from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
-import { addItem, CartLine, removeItem, selectCartCount } from "../store/cartSlice";
-import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
 
 const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
-const money = (n: number) => "₹" + n.toFixed(2);
+const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 
 export default function CartScreen() {
-  const dispatch = useAppDispatch();
   const toast = useToast();
-  const items = useAppSelector((s) => s.cart.items);
-  const lines = Object.values(items);
-  const count = selectCartCount(items);
+  const { data: cart, isLoading } = useCartQuery();
+  const [addToCart] = useAddToCartMutation();
+  const [updateCartItem] = useUpdateCartItemMutation();
+  const [removeCartItem] = useRemoveCartItemMutation();
+  const [applyCoupon, { isLoading: applying }] = useApplyCouponMutation();
+  const [removeCoupon] = useRemoveCouponMutation();
 
   const [code, setCode] = useState("");
-  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
 
-  // Placeholder bill math (the backend cart billing replaces this later).
-  const subtotal = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
-  const delivery = subtotal >= 200 || subtotal === 0 ? 0 : 25;
-  const smallCartFee = subtotal > 0 && subtotal < 100 ? 15 : 0;
-  const tax = +(subtotal * 0.05).toFixed(2);
-  const discount = coupon ? Math.min(coupon.discount, subtotal) : 0;
-  const toPay = Math.max(0, subtotal + delivery + smallCartFee + tax - discount);
+  const lines = cart?.items ?? [];
+  const bill = cart?.bill;
+  const count = cart?.item_count ?? 0;
 
-  function applyCoupon() {
-    const c = code.trim().toUpperCase();
+  async function onApplyCoupon() {
+    const c = code.trim();
     if (!c) {
       toast("Enter a coupon code.", "info");
       return;
     }
-    // UI-only placeholder discount until the coupon API is wired.
-    setCoupon({ code: c, discount: Math.round(subtotal * 0.1) });
-    toast("Coupon applied.");
+    try {
+      await applyCoupon(c).unwrap();
+      setCode("");
+      toast("Coupon applied.");
+    } catch (e: any) {
+      toast(e?.data?.error || "Couldn't apply that coupon.", "error");
+    }
   }
 
   const billRow = (label: string, value: string, opts?: { strong?: boolean; accent?: boolean }) => (
@@ -68,6 +77,16 @@ export default function CartScreen() {
     </View>
   );
 
+  if (isLoading) {
+    return (
+      <Screen>
+        <View style={styles.empty}>
+          <ActivityIndicator size="large" color={colors.green} />
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen padded={false}>
       <View style={styles.flex}>
@@ -86,54 +105,71 @@ export default function CartScreen() {
               {header}
               <View style={styles.list}>
                 {lines.map((l, i) => (
-                  <CartCard key={l.id} line={l} tint={TINTS[i % TINTS.length]} dispatch={dispatch} />
+                  <CartCard
+                    key={l.id}
+                    line={l}
+                    tint={TINTS[i % TINTS.length]}
+                    onInc={() => addToCart({ variant_id: l.variant, quantity: 1 })}
+                    onDec={() =>
+                      l.quantity <= 1
+                        ? removeCartItem(l.id)
+                        : updateCartItem({ item_id: l.id, quantity: l.quantity - 1 })
+                    }
+                  />
                 ))}
               </View>
             </ScrollView>
 
             {/* Fixed footer: coupon + bill details + checkout. */}
             <View style={styles.footer}>
-              <View style={styles.couponRow}>
-                <View style={styles.couponInputWrap}>
-                  <Ionicons name="pricetag-outline" size={16} color={colors.green} />
-                  <TextInput
-                    style={styles.couponInput}
-                    value={code}
-                    onChangeText={setCode}
-                    placeholder="Enter coupon code"
-                    placeholderTextColor={colors.muted}
-                    autoCapitalize="characters"
-                  />
+              {cart?.coupon_code ? (
+                <View style={styles.couponApplied}>
+                  <Ionicons name="pricetag" size={16} color={colors.green} />
+                  <Text style={styles.couponAppliedText}>Coupon {cart.coupon_code} applied</Text>
+                  <Pressable onPress={() => removeCoupon()} hitSlop={8}>
+                    <Text style={styles.couponRemove}>Remove</Text>
+                  </Pressable>
                 </View>
-                <Pressable style={styles.applyBtn} onPress={applyCoupon}>
-                  <Text style={styles.applyText}>Apply</Text>
-                </Pressable>
-              </View>
+              ) : (
+                <View style={styles.couponRow}>
+                  <View style={styles.couponInputWrap}>
+                    <Ionicons name="pricetag-outline" size={16} color={colors.green} />
+                    <TextInput
+                      style={styles.couponInput}
+                      value={code}
+                      onChangeText={setCode}
+                      placeholder="Enter coupon code"
+                      placeholderTextColor={colors.muted}
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                  <Pressable style={styles.applyBtn} onPress={onApplyCoupon} disabled={applying}>
+                    <Text style={styles.applyText}>Apply</Text>
+                  </Pressable>
+                </View>
+              )}
 
               <Text style={styles.billHead}>BILL DETAILS</Text>
               <View style={styles.billCard}>
-                {billRow("Subtotal", money(subtotal))}
-                {coupon ? (
-                  <View style={styles.billRow}>
-                    <Pressable onPress={() => setCoupon(null)}>
-                      <Text style={[styles.billLabel, styles.couponLabel]}>
-                        Coupon ({coupon.code}) · Remove
-                      </Text>
-                    </Pressable>
-                    <Text style={[styles.billValue, styles.discountValue]}>−{money(discount)}</Text>
-                  </View>
+                {bill ? (
+                  <>
+                    {billRow("Subtotal", money(bill.subtotal))}
+                    {Number(bill.coupon_discount) > 0
+                      ? billRow(`Coupon (${bill.coupon_code})`, "−" + money(bill.coupon_discount))
+                      : null}
+                    {billRow("Delivery", Number(bill.delivery_fee) > 0 ? money(bill.delivery_fee) : "FREE")}
+                    {Number(bill.small_cart_fee) > 0 ? billRow("Small-cart fee", money(bill.small_cart_fee)) : null}
+                    {billRow("Tax", money(bill.tax))}
+                    <View style={styles.billDivider} />
+                    {billRow("To Pay", money(bill.grand_total), { strong: true, accent: true })}
+                  </>
                 ) : null}
-                {billRow("Delivery", delivery > 0 ? money(delivery) : "FREE")}
-                {smallCartFee > 0 ? billRow("Small-cart fee", money(smallCartFee)) : null}
-                {billRow("Tax", money(tax))}
-                <View style={styles.billDivider} />
-                {billRow("To Pay", money(toPay), { strong: true, accent: true })}
               </View>
 
               <Pressable style={styles.checkoutBtn} onPress={() => toast("Checkout — coming soon.")}>
                 <Text style={styles.checkoutText}>Checkout</Text>
                 <View style={styles.checkoutRight}>
-                  <Text style={styles.checkoutTotal}>{money(toPay)}</Text>
+                  <Text style={styles.checkoutTotal}>{money(bill?.grand_total ?? 0)}</Text>
                   <Ionicons name="arrow-forward" size={18} color={colors.white} />
                 </View>
               </Pressable>
@@ -148,14 +184,15 @@ export default function CartScreen() {
 function CartCard({
   line,
   tint,
-  dispatch,
+  onInc,
+  onDec,
 }: {
-  line: CartLine;
+  line: CartItem;
   tint: string;
-  dispatch: ReturnType<typeof useAppDispatch>;
+  onInc: () => void;
+  onDec: () => void;
 }) {
-  const img = imageUrl(line.image);
-  const { qty, ...snapshot } = line; // eslint-disable-line @typescript-eslint/no-unused-vars
+  const img = imageUrl(line.image_url);
   return (
     <View style={styles.card}>
       <View style={[styles.cardArt, { backgroundColor: tint }]}>
@@ -163,17 +200,17 @@ function CartCard({
       </View>
       <View style={styles.cardInfo}>
         <Text style={styles.cardName} numberOfLines={2}>
-          {line.name}
+          {line.product_name}
         </Text>
-        {line.variantLabel ? <Text style={styles.cardVariant}>{line.variantLabel}</Text> : null}
+        {line.variant_label ? <Text style={styles.cardVariant}>{line.variant_label}</Text> : null}
         <Text style={styles.cardPrice}>{money(line.price)}</Text>
       </View>
       <View style={styles.stepper}>
-        <Pressable onPress={() => dispatch(removeItem(line.id))} hitSlop={6} style={styles.stepBtn}>
+        <Pressable onPress={onDec} hitSlop={6} style={styles.stepBtn}>
           <Ionicons name="remove" size={16} color={colors.white} />
         </Pressable>
-        <Text style={styles.stepQty}>{line.qty}</Text>
-        <Pressable onPress={() => dispatch(addItem(snapshot))} hitSlop={6} style={styles.stepBtn}>
+        <Text style={styles.stepQty}>{line.quantity}</Text>
+        <Pressable onPress={onInc} hitSlop={6} style={styles.stepBtn}>
           <Ionicons name="add" size={16} color={colors.white} />
         </Pressable>
       </View>
@@ -281,6 +318,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   applyText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
+  couponApplied: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.greenTint,
+    borderRadius: 12,
+    paddingVertical: spacing(1.25),
+    paddingHorizontal: spacing(1.5),
+  },
+  couponAppliedText: { flex: 1, fontFamily: fonts.semibold, fontSize: 13, color: colors.green },
+  couponRemove: { fontFamily: fonts.bold, fontSize: 13, color: colors.error },
 
   billHead: {
     fontFamily: fontsAlt.extrabold,
@@ -297,8 +345,6 @@ const styles = StyleSheet.create({
   billValue: { fontFamily: fonts.semibold, fontSize: 14, color: colors.heading },
   billStrong: { fontFamily: fonts.bold, fontSize: 16 },
   billAccent: { color: colors.green },
-  couponLabel: { color: colors.green },
-  discountValue: { color: colors.green },
   billDivider: { height: 1, backgroundColor: "rgba(37,61,78,0.12)", marginVertical: spacing(1) },
 
   checkoutBtn: {
