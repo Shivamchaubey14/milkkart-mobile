@@ -12,11 +12,12 @@ import {
   useCheckoutMutation,
   useDeliverySlotsQuery,
   useInitiatePaymentMutation,
+  useServiceabilityCheckQuery,
 } from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
+import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
@@ -79,7 +80,24 @@ export default function CheckoutScreen() {
 
   const selected = addresses?.find((a) => a.id === addressId);
   const bill = cart?.bill;
-  const upcomingSlots = (slots ?? []).filter((s) => !s.is_full).slice(0, 4);
+
+  // Serviceability of the selected address → ETA shown on the Instant slot.
+  const { data: svc } = useServiceabilityCheckQuery(
+    {
+      pincode: selected?.pincode,
+      lat: selected?.latitude ?? undefined,
+      lng: selected?.longitude ?? undefined,
+    },
+    { skip: !selected },
+  );
+  const eta = svc?.area?.delivery_eta_minutes ?? 30;
+
+  // Only today/tomorrow-and-later slots (the dev DB has stale past ones).
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const upcomingSlots = (slots ?? [])
+    .filter((s) => !s.is_full && new Date(s.date + "T00:00:00").getTime() >= todayStart.getTime())
+    .slice(0, 4);
   const placing = placingCheckout || paying;
 
   async function placeOrder() {
@@ -171,7 +189,7 @@ export default function CheckoutScreen() {
             >
               <Ionicons name="flash" size={16} color={slotId === null ? colors.green : colors.muted} />
               <Text style={[styles.slotTitle, slotId === null && styles.slotTitleActive]}>Instant</Text>
-              <Text style={[styles.slotSub, slotId === null && styles.slotSubActive]}>Within 30 min</Text>
+              <Text style={[styles.slotSub, slotId === null && styles.slotSubActive]}>Within {eta} min</Text>
             </Pressable>
             {upcomingSlots.map((s) => {
               const active = s.id === slotId;
@@ -385,8 +403,10 @@ const styles = StyleSheet.create({
 
   // Bill
   billCard: {
-    backgroundColor: palette.ink[100],
+    backgroundColor: colors.bg,
     borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
     padding: spacing(1.75),
     marginTop: spacing(2.5),
   },

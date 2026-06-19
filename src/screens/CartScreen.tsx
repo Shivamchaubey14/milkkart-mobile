@@ -413,8 +413,14 @@ const styles = StyleSheet.create({
     marginTop: spacing(2),
     marginBottom: spacing(1),
   },
-  // Bill card — light Ink 100 surface.
-  billCard: { backgroundColor: palette.ink[100], borderRadius: 14, padding: spacing(1.75) },
+  // Bill card — white with a subtle border.
+  billCard: {
+    backgroundColor: colors.bg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    padding: spacing(1.75),
+  },
   billRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: spacing(0.5) },
   billLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.heading },
   billValue: { fontFamily: fonts.semibold, fontSize: 14, color: colors.heading },
