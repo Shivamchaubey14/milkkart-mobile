@@ -1,12 +1,25 @@
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { useBannersQuery, useCategoriesQuery, useProductsQuery } from "../api/baseApi";
+import {
+  CatalogProduct,
+  useAddToCartMutation,
+  useBannersQuery,
+  useCartQuery,
+  useCategoriesQuery,
+  useProductsQuery,
+  useRemoveCartItemMutation,
+  useUpdateCartItemMutation,
+} from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
+import { useToast } from "../components/Toast";
+import type { RootStackParamList } from "../navigation/RootNavigator";
 import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -17,6 +30,7 @@ const BADGE_PINK = "#ff6b81";
 const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
 
 export default function HomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners } = useBannersQuery();
@@ -42,18 +56,32 @@ export default function HomeScreen() {
       : undefined;
   const { data: products, isFetching } = useProductsQuery(productArg);
 
-  const [cart, setCart] = useState<Record<number, number>>({});
+  const toast = useToast();
+  const { data: cart } = useCartQuery();
+  const [addToCart] = useAddToCartMutation();
+  const [updateCartItem] = useUpdateCartItemMutation();
+  const [removeCartItem] = useRemoveCartItemMutation();
   const [wishlist, setWishlist] = useState<Record<number, boolean>>({});
 
-  const inc = (id: number) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
-  const dec = (id: number) =>
-    setCart((c) => {
-      const next = (c[id] || 0) - 1;
-      const copy = { ...c };
-      if (next <= 0) delete copy[id];
-      else copy[id] = next;
-      return copy;
-    });
+  // Cart line for a product, keyed by its default variant id.
+  const lineFor = (p: CatalogProduct) =>
+    cart?.items.find((it) => it.variant === p.default_variant?.id);
+
+  async function add(p: CatalogProduct) {
+    const variantId = p.default_variant?.id;
+    if (!variantId) return;
+    try {
+      await addToCart({ variant_id: variantId }).unwrap();
+    } catch {
+      toast("Couldn't add to cart.", "error");
+    }
+  }
+  async function dec(p: CatalogProduct) {
+    const line = lineFor(p);
+    if (!line) return;
+    if (line.quantity <= 1) removeCartItem(line.id);
+    else updateCartItem({ item_id: line.id, quantity: line.quantity - 1 });
+  }
   const toggleWish = (id: number) => setWishlist((w) => ({ ...w, [id]: !w[id] }));
 
   return (
@@ -133,11 +161,15 @@ export default function HomeScreen() {
                 const price = Number(v?.price ?? 0);
                 const mrp = Number(v?.mrp ?? 0);
                 const discount = v?.discount_percent ?? 0;
-                const qty = cart[p.id] || 0;
+                const qty = lineFor(p)?.quantity || 0;
                 const wished = !!wishlist[p.id];
                 const img = imageUrl(p.image_url);
                 return (
-                  <View key={p.id} style={styles.card}>
+                  <Pressable
+                    key={p.id}
+                    style={styles.card}
+                    onPress={() => navigation.navigate("Product", { slug: p.slug })}
+                  >
                     <View style={[styles.cardArt, { backgroundColor: TINTS[i % TINTS.length] }]}>
                       {img ? (
                         <Image source={{ uri: img }} style={styles.cardImg} resizeMode="contain" />
@@ -162,7 +194,7 @@ export default function HomeScreen() {
                       <Text style={styles.cardCat} numberOfLines={1}>
                         {p.category_name}
                       </Text>
-                      <Text style={styles.cardName} numberOfLines={1}>
+                      <Text style={styles.cardName} numberOfLines={2}>
                         {p.name}
                       </Text>
 
@@ -187,23 +219,23 @@ export default function HomeScreen() {
 
                         {qty > 0 ? (
                           <View style={styles.stepper}>
-                            <Pressable onPress={() => dec(p.id)} hitSlop={6} style={styles.stepBtn}>
+                            <Pressable onPress={() => dec(p)} hitSlop={6} style={styles.stepBtn}>
                               <Ionicons name="remove" size={16} color={colors.white} />
                             </Pressable>
                             <Text style={styles.stepQty}>{qty}</Text>
-                            <Pressable onPress={() => inc(p.id)} hitSlop={6} style={styles.stepBtn}>
+                            <Pressable onPress={() => add(p)} hitSlop={6} style={styles.stepBtn}>
                               <Ionicons name="add" size={16} color={colors.white} />
                             </Pressable>
                           </View>
                         ) : (
-                          <Pressable onPress={() => inc(p.id)} style={styles.addBtn}>
-                            <Ionicons name="add" size={14} color={colors.green} />
+                          <Pressable onPress={() => add(p)} style={styles.addBtn}>
+                            <Ionicons name="cart-outline" size={14} color={colors.green} />
                             <Text style={styles.addText}>Add</Text>
                           </Pressable>
                         )}
                       </View>
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -336,15 +368,17 @@ const styles = StyleSheet.create({
   ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 4, minHeight: 16 },
   ratingText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.text, marginLeft: 3 },
   noRating: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted },
-  priceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(1) },
-  priceLeft: { flexDirection: "row", alignItems: "baseline" },
+  priceRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: spacing(1) },
+  // Price stacked: current price on top, struck MRP below — keeps the row
+  // narrow so the Add button never gets pushed against the card edge.
+  priceLeft: { flexShrink: 1 },
   price: { fontFamily: fonts.bold, fontSize: 15, color: colors.green },
   mrp: {
     fontFamily: fontsAlt.regular,
     fontSize: 11,
     color: colors.muted,
     textDecorationLine: "line-through",
-    marginLeft: 4,
+    marginTop: 1,
   },
   addBtn: {
     flexDirection: "row",
@@ -353,6 +387,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 5,
     paddingHorizontal: 9,
+    marginLeft: spacing(0.75),
   },
   addText: { fontFamily: fonts.bold, fontSize: 12, color: colors.green, marginLeft: 2 },
   stepper: {
@@ -361,6 +396,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green,
     borderRadius: 8,
     paddingHorizontal: 4,
+    marginLeft: spacing(0.75),
   },
   stepBtn: { width: 24, height: 28, alignItems: "center", justifyContent: "center" },
   stepQty: { fontFamily: fonts.bold, fontSize: 13, color: colors.white, minWidth: 16, textAlign: "center" },

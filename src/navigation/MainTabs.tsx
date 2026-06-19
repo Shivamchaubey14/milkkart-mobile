@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
+import { useCartQuery } from "../api/baseApi";
+import CartScreen from "../screens/CartScreen";
 import HomeScreen from "../screens/HomeScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
-import ProfileScreen from "../screens/ProfileScreen";
+import ProfileStack from "./ProfileStack";
 import { colors, fonts } from "../theme";
 
 const Tab = createBottomTabNavigator();
@@ -21,9 +23,10 @@ const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
 
 const AlertsScreen = () => <PlaceholderScreen title="Alerts" icon="notifications-outline" />;
 const WishlistScreen = () => <PlaceholderScreen title="Wishlist" icon="heart-outline" />;
-const CartScreen = () => <PlaceholderScreen title="Cart" icon="cart-outline" />;
 
 export default function MainTabs() {
+  const { data: cart } = useCartQuery();
+  const cartCount = cart?.item_count ?? 0;
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -46,8 +49,20 @@ export default function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Alerts" component={AlertsScreen} />
       <Tab.Screen name="Wishlist" component={WishlistScreen} />
-      <Tab.Screen name="Cart" component={CartScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen
+        name="Cart"
+        component={CartScreen}
+        options={{
+          tabBarBadge: cartCount > 0 ? cartCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.green,
+            color: colors.white,
+            fontFamily: fonts.bold,
+            fontSize: 10,
+          },
+        }}
+      />
+      <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }

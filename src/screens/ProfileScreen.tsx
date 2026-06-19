@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { logout } from "../store/authSlice";
 import { clearTokens } from "../store/secureTokens";
@@ -70,6 +73,7 @@ export default function ProfileScreen() {
   const user = useAppSelector((s) => s.auth.user);
   const dispatch = useAppDispatch();
   const toast = useToast();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
 
   const initial = (user?.name?.trim()?.[0] || "U").toUpperCase();
 
@@ -106,7 +110,15 @@ export default function ProfileScreen() {
         {/* Menu list */}
         <View style={styles.menu}>
           {MENU.map((m) => (
-            <Pressable key={m.key} style={styles.item} onPress={() => toast(`${m.title} — coming soon.`)}>
+            <Pressable
+              key={m.key}
+              style={styles.item}
+              onPress={() =>
+                m.key === "profile"
+                  ? navigation.navigate("Account")
+                  : toast(`${m.title} — coming soon.`)
+              }
+            >
               <View style={[styles.itemIcon, { backgroundColor: m.tint }]}>
                 <Ionicons name={m.icon} size={20} color={m.fg} />
               </View>
@@ -151,6 +163,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(2.5),
     paddingTop: spacing(2.5),
     paddingBottom: spacing(3),
+    minHeight: 150,
     overflow: "hidden",
   },
   blob: {
