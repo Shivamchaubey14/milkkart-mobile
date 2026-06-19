@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
+  Animated,
+  Dimensions,
   Image,
   Pressable,
   ScrollView,
@@ -10,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import ConfettiCannon from "react-native-confetti-cannon";
 
 import {
   CartItem,
@@ -27,6 +30,7 @@ import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
 
 const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
+const SCREEN_W = Dimensions.get("window").width;
 
 export default function CartScreen() {
   const toast = useToast();
@@ -39,9 +43,23 @@ export default function CartScreen() {
 
   const [code, setCode] = useState("");
 
+  // Gentle bounce for the "scroll for items" down-arrow hint.
+  const bounce = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounce, { toValue: 4, duration: 600, useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: 0, duration: 600, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [bounce]);
+
   const lines = cart?.items ?? [];
   const bill = cart?.bill;
   const count = cart?.item_count ?? 0;
+  const freeDelivery = lines.length > 0 && !!bill && Number(bill.delivery_fee) === 0;
 
   async function onApplyCoupon() {
     const c = code.trim();
@@ -122,6 +140,10 @@ export default function CartScreen() {
 
             {/* Fixed footer: coupon + bill details + checkout. */}
             <View style={styles.footer}>
+              <Animated.View style={[styles.scrollHint, { transform: [{ translateY: bounce }] }]}>
+                <Ionicons name="chevron-down" size={18} color={colors.muted} />
+              </Animated.View>
+
               {cart?.coupon_code ? (
                 <View style={styles.couponApplied}>
                   <Ionicons name="pricetag" size={16} color={colors.green} />
@@ -157,11 +179,21 @@ export default function CartScreen() {
                     {Number(bill.coupon_discount) > 0
                       ? billRow(`Coupon (${bill.coupon_code})`, "−" + money(bill.coupon_discount))
                       : null}
-                    {billRow("Delivery", Number(bill.delivery_fee) > 0 ? money(bill.delivery_fee) : "FREE")}
+                    {freeDelivery ? (
+                      <View style={[styles.billRow, styles.freeRow]}>
+                        <Text style={styles.billLabel}>Delivery</Text>
+                        <View style={styles.freeValue}>
+                          <Ionicons name="sparkles" size={13} color={colors.green} />
+                          <Text style={styles.freeFree}>FREE</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      billRow("Delivery", money(bill.delivery_fee))
+                    )}
                     {Number(bill.small_cart_fee) > 0 ? billRow("Small-cart fee", money(bill.small_cart_fee)) : null}
                     {billRow("Tax", money(bill.tax))}
                     <View style={styles.billDivider} />
-                    {billRow("To Pay", money(bill.grand_total), { strong: true, accent: true })}
+                    {billRow("To Pay", money(bill.grand_total), { strong: true })}
                   </>
                 ) : null}
               </View>
@@ -176,6 +208,16 @@ export default function CartScreen() {
             </View>
           </>
         )}
+        {freeDelivery ? (
+          <ConfettiCannon
+            count={120}
+            origin={{ x: SCREEN_W / 2, y: -10 }}
+            autoStart
+            fadeOut
+            explosionSpeed={350}
+            fallSpeed={2800}
+          />
+        ) : null}
       </View>
     </Screen>
   );
@@ -318,17 +360,26 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   applyText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
+  // Applied coupon — Cream Yolk 400 to draw attention.
   couponApplied: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: colors.greenTint,
+    backgroundColor: palette.yellow[400],
     borderRadius: 12,
     paddingVertical: spacing(1.25),
     paddingHorizontal: spacing(1.5),
   },
-  couponAppliedText: { flex: 1, fontFamily: fonts.semibold, fontSize: 13, color: colors.green },
+  couponAppliedText: { flex: 1, fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
   couponRemove: { fontFamily: fonts.bold, fontSize: 13, color: colors.error },
+
+  // Down-arrow hint that the list above scrolls.
+  scrollHint: { alignItems: "center", paddingBottom: spacing(0.5) },
+
+  // Inline free-delivery highlight inside the bill card.
+  freeRow: { backgroundColor: colors.greenTint, borderRadius: 8, paddingHorizontal: spacing(1), marginVertical: 1 },
+  freeValue: { flexDirection: "row", alignItems: "center", gap: 4 },
+  freeFree: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
 
   billHead: {
     fontFamily: fontsAlt.extrabold,
@@ -344,7 +395,8 @@ const styles = StyleSheet.create({
   billLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.heading },
   billValue: { fontFamily: fonts.semibold, fontSize: 14, color: colors.heading },
   billStrong: { fontFamily: fonts.bold, fontSize: 16 },
-  billAccent: { color: colors.green },
+  // To Pay value — Cream Yolk 400.
+  billAccent: { color: palette.yellow[400] },
   billDivider: { height: 1, backgroundColor: "rgba(37,61,78,0.12)", marginVertical: spacing(1) },
 
   checkoutBtn: {
