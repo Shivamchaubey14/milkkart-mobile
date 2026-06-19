@@ -4,7 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { useBannersQuery, useCategoriesQuery, useProductsQuery } from "../api/baseApi";
+import { CatalogProduct, useBannersQuery, useCategoriesQuery, useProductsQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
@@ -51,7 +51,17 @@ export default function HomeScreen() {
   const cart = useAppSelector((s) => s.cart.items);
   const [wishlist, setWishlist] = useState<Record<number, boolean>>({});
 
-  const inc = (id: number) => dispatch(addItem(id));
+  const add = (p: CatalogProduct) =>
+    dispatch(
+      addItem({
+        id: p.id,
+        name: p.name,
+        variantLabel: p.default_variant?.label ?? "",
+        price: Number(p.default_variant?.price ?? 0),
+        image: p.image_url,
+        slug: p.slug,
+      }),
+    );
   const dec = (id: number) => dispatch(removeItem(id));
   const toggleWish = (id: number) => setWishlist((w) => ({ ...w, [id]: !w[id] }));
 
@@ -132,7 +142,7 @@ export default function HomeScreen() {
                 const price = Number(v?.price ?? 0);
                 const mrp = Number(v?.mrp ?? 0);
                 const discount = v?.discount_percent ?? 0;
-                const qty = cart[p.id] || 0;
+                const qty = cart[p.id]?.qty || 0;
                 const wished = !!wishlist[p.id];
                 const img = imageUrl(p.image_url);
                 return (
@@ -194,12 +204,12 @@ export default function HomeScreen() {
                               <Ionicons name="remove" size={16} color={colors.white} />
                             </Pressable>
                             <Text style={styles.stepQty}>{qty}</Text>
-                            <Pressable onPress={() => inc(p.id)} hitSlop={6} style={styles.stepBtn}>
+                            <Pressable onPress={() => add(p)} hitSlop={6} style={styles.stepBtn}>
                               <Ionicons name="add" size={16} color={colors.white} />
                             </Pressable>
                           </View>
                         ) : (
-                          <Pressable onPress={() => inc(p.id)} style={styles.addBtn}>
+                          <Pressable onPress={() => add(p)} style={styles.addBtn}>
                             <Ionicons name="cart-outline" size={14} color={colors.green} />
                             <Text style={styles.addText}>Add</Text>
                           </Pressable>
