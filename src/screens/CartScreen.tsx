@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ActivityIndicator,
   Animated,
@@ -26,6 +28,7 @@ import {
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import type { RootStackParamList } from "../navigation/RootNavigator";
 import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
 
 const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
@@ -34,6 +37,7 @@ const SCREEN_W = Dimensions.get("window").width;
 
 export default function CartScreen() {
   const toast = useToast();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { data: cart, isLoading } = useCartQuery();
   const [addToCart] = useAddToCartMutation();
   const [updateCartItem] = useUpdateCartItemMutation();
@@ -210,7 +214,7 @@ export default function CartScreen() {
                 ) : null}
               </View>
 
-              <Pressable style={styles.checkoutBtn} onPress={() => toast("Checkout — coming soon.")}>
+              <Pressable style={styles.checkoutBtn} onPress={() => navigation.navigate("Checkout")}>
                 <Text style={styles.checkoutText}>Checkout</Text>
                 <View style={styles.checkoutRight}>
                   <Text style={styles.checkoutTotal}>{money(bill?.grand_total ?? 0)}</Text>
