@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -11,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 import {
@@ -26,6 +29,15 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const QUICK = [100, 200, 500];
 
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+type UpiApp = { key: string; name: string; letter?: string; icon?: IoniconName; tint: string; fg: string };
+const UPI_APPS: UpiApp[] = [
+  { key: "gpay", name: "Google Pay", letter: "G", tint: "#e8f0fe", fg: "#4285F4" },
+  { key: "phonepe", name: "PhonePe", letter: "P", tint: "#efe6f7", fg: "#5f259f" },
+  { key: "paytm", name: "Paytm", letter: "P", tint: "#e6f3fc", fg: "#00baf2" },
+  { key: "other", name: "Other UPI App", icon: "apps-outline", tint: colors.lineSoft, fg: colors.heading },
+];
+
 function fmtDate(iso: string) {
   const d = new Date(iso);
   const day = d.getDate();
@@ -40,20 +52,27 @@ export default function WalletScreen() {
   const [topup, { isLoading: t1 }] = useWalletTopupMutation();
   const [mockPay, { isLoading: t2 }] = useWalletMockPayMutation();
   const [amount, setAmount] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const adding = t1 || t2;
   const txns = wallet?.recent_transactions ?? [];
 
-  async function addMoney() {
+  function openSheet() {
     const amt = parseFloat(amount);
     if (!amt || amt < 1) {
       toast("Enter an amount to add.", "info");
       return;
     }
+    setSheetOpen(true);
+  }
+
+  async function pay() {
+    const amt = parseFloat(amount);
     try {
       const res = await topup(amt).unwrap();
       await mockPay(res.gateway.order_id).unwrap();
       toast(`${money(amt)} added to your wallet.`);
       setAmount("");
+      setSheetOpen(false);
     } catch (e: any) {
       toast(e?.data?.error || "Online top-up needs the payment gateway (coming soon).", "error");
     }
@@ -111,8 +130,8 @@ export default function WalletScreen() {
                 keyboardType="number-pad"
               />
             </View>
-            <Pressable style={styles.addBtn} onPress={addMoney} disabled={adding}>
-              {adding ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.addText}>Add</Text>}
+            <Pressable style={styles.addBtn} onPress={openSheet}>
+              <Text style={styles.addText}>Add</Text>
             </Pressable>
           </View>
 
@@ -130,7 +149,90 @@ export default function WalletScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <AddMoneySheet
+        visible={sheetOpen}
+        amount={amount}
+        loading={adding}
+        onClose={() => setSheetOpen(false)}
+        onPick={pay}
+      />
     </Screen>
+  );
+}
+
+function AddMoneySheet({
+  visible,
+  amount,
+  loading,
+  onClose,
+  onPick,
+}: {
+  visible: boolean;
+  amount: string;
+  loading: boolean;
+  onClose: () => void;
+  onPick: (app: UpiApp) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(700)).current;
+  const backdrop = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(backdrop, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 160 }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(backdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 700, duration: 220, useNativeDriver: true }),
+      ]).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  if (!mounted) return null;
+
+  return (
+    <Modal transparent visible={mounted} onRequestClose={onClose} animationType="none" statusBarTranslucent>
+      <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+      <Animated.View
+        style={[styles.sheet, { transform: [{ translateY }], paddingBottom: insets.bottom + spacing(2) }]}
+      >
+        <View style={styles.handle} />
+        <View style={styles.sheetHead}>
+          <Text style={styles.sheetTitle}>Add {money(amount || 0)}</Text>
+          <Pressable style={styles.sheetClose} onPress={onClose} hitSlop={8}>
+            <Ionicons name="close" size={18} color={colors.heading} />
+          </Pressable>
+        </View>
+        <Text style={styles.sheetSub}>Choose a UPI app to pay</Text>
+
+        {UPI_APPS.map((app) => (
+          <Pressable key={app.key} style={styles.upiRow} onPress={() => onPick(app)} disabled={loading}>
+            <View style={[styles.upiBadge, { backgroundColor: app.tint }]}>
+              {app.letter ? (
+                <Text style={[styles.upiLetter, { color: app.fg }]}>{app.letter}</Text>
+              ) : (
+                <Ionicons name={app.icon ?? "apps-outline"} size={18} color={app.fg} />
+              )}
+            </View>
+            <Text style={styles.upiName}>{app.name}</Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.green} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            )}
+          </Pressable>
+        ))}
+      </Animated.View>
+    </Modal>
   );
 }
 
@@ -267,4 +369,43 @@ const styles = StyleSheet.create({
   txnTitle: { fontFamily: fontsAlt.bold, fontSize: 14, color: colors.heading },
   txnSub: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   txnAmount: { fontFamily: fontsAlt.bold, fontSize: 15 },
+
+  // Add-money bottom sheet
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(37,61,78,0.45)" },
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingHorizontal: spacing(2.5),
+    paddingTop: spacing(1.25),
+  },
+  handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(2) },
+  sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sheetTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.heading },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.bgSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetSub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.green, marginTop: 4, marginBottom: spacing(2) },
+  upiRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.bg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    padding: spacing(1.5),
+    marginBottom: spacing(1.25),
+  },
+  upiBadge: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: spacing(1.5) },
+  upiLetter: { fontFamily: fonts.bold, fontSize: 17 },
+  upiName: { flex: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
 });
