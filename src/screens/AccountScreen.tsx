@@ -28,6 +28,13 @@ import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
+const labelIcon = (label: string): IoniconName => {
+  const l = (label || "").toLowerCase();
+  if (l === "work") return "briefcase-outline";
+  if (l === "other") return "location-outline";
+  return "home-outline";
+};
+
 function formatAddress(a: Address): string {
   return [a.address_line, a.landmark, a.city, `${a.state} ${a.pincode}`.trim()]
     .map((s) => s.trim())
@@ -209,7 +216,7 @@ export default function AccountScreen() {
               <View key={a.id} style={styles.addrCard}>
                 <View style={styles.addrTop}>
                   <View style={styles.addrIcon}>
-                    <Ionicons name="home-outline" size={18} color={colors.green} />
+                    <Ionicons name={labelIcon(a.label)} size={18} color={colors.green} />
                   </View>
                   <Text style={styles.addrLabel}>
                     {a.label ? a.label[0].toUpperCase() + a.label.slice(1) : "Address"}
