@@ -41,6 +41,7 @@ export default function WalletScreen() {
   const [mockPay, { isLoading: t2 }] = useWalletMockPayMutation();
   const [amount, setAmount] = useState("");
   const adding = t1 || t2;
+  const txns = wallet?.recent_transactions ?? [];
 
   async function addMoney() {
     const amt = parseFloat(amount);
@@ -61,67 +62,72 @@ export default function WalletScreen() {
   return (
     <Screen padded={false}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.blob} />
-            <Text style={styles.headerTitle}>MilkKart Wallet</Text>
+        {/* Tall dark header — the balance card overlaps onto it. */}
+        <View style={styles.header}>
+          <View style={styles.blob} />
+          <Text style={styles.headerTitle}>MilkKart Wallet</Text>
+        </View>
+
+        {/* Fixed top: balance + add money + section heading. */}
+        <View style={styles.topBody}>
+          <LinearGradient
+            colors={[colors.green, colors.greenDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.balanceCard}
+          >
+            <View style={styles.balanceBlob} />
+            <View style={styles.balanceTop}>
+              <Text style={styles.balanceLabel}>Available Balance</Text>
+              <Text style={styles.brand}>MilkKart</Text>
+            </View>
+            <Text style={styles.balanceValue}>{isLoading ? "—" : money(wallet?.balance ?? 0)}</Text>
+          </LinearGradient>
+
+          <Text style={styles.sectionTitle}>Add Money</Text>
+          <View style={styles.quickRow}>
+            {QUICK.map((q) => {
+              const active = amount === String(q);
+              return (
+                <Pressable
+                  key={q}
+                  onPress={() => setAmount(String(q))}
+                  style={[styles.quickChip, active && styles.quickChipActive]}
+                >
+                  <Text style={[styles.quickText, active && styles.quickTextActive]}>+₹{q}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.addRow}>
+            <View style={styles.amountWrap}>
+              <Text style={styles.rupee}>₹</Text>
+              <TextInput
+                style={styles.amountInput}
+                value={amount}
+                onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
+                placeholder="Enter amount"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+              />
+            </View>
+            <Pressable style={styles.addBtn} onPress={addMoney} disabled={adding}>
+              {adding ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.addText}>Add</Text>}
+            </Pressable>
           </View>
 
-          <View style={styles.body}>
-            {/* Balance card */}
-            <LinearGradient colors={[colors.green, colors.greenDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balanceCard}>
-              <View style={styles.balanceBlob} />
-              <View style={styles.balanceTop}>
-                <Text style={styles.balanceLabel}>Available Balance</Text>
-                <Text style={styles.brand}>MilkKart</Text>
-              </View>
-              <Text style={styles.balanceValue}>{isLoading ? "—" : money(wallet?.balance ?? 0)}</Text>
-            </LinearGradient>
+          <Text style={styles.sectionTitle}>Transaction History</Text>
+        </View>
 
-            {/* Add money */}
-            <Text style={styles.sectionTitle}>Add Money</Text>
-            <View style={styles.quickRow}>
-              {QUICK.map((q) => {
-                const active = amount === String(q);
-                return (
-                  <Pressable
-                    key={q}
-                    onPress={() => setAmount(String(q))}
-                    style={[styles.quickChip, active && styles.quickChipActive]}
-                  >
-                    <Text style={[styles.quickText, active && styles.quickTextActive]}>+₹{q}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={styles.addRow}>
-              <View style={styles.amountWrap}>
-                <Text style={styles.rupee}>₹</Text>
-                <TextInput
-                  style={styles.amountInput}
-                  value={amount}
-                  onChangeText={(v) => setAmount(v.replace(/[^0-9]/g, ""))}
-                  placeholder="Enter amount"
-                  placeholderTextColor={colors.muted}
-                  keyboardType="number-pad"
-                />
-              </View>
-              <Pressable style={styles.addBtn} onPress={addMoney} disabled={adding}>
-                {adding ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.addText}>Add</Text>}
-              </Pressable>
-            </View>
-
-            {/* Transactions */}
-            <Text style={styles.sectionTitle}>Transaction History</Text>
-            {isLoading ? (
-              <ActivityIndicator color={colors.green} style={{ marginTop: spacing(2) }} />
-            ) : wallet && wallet.recent_transactions.length > 0 ? (
-              wallet.recent_transactions.map((tx) => <TxnRow key={tx.id} tx={tx} />)
-            ) : (
-              <Text style={styles.empty}>No transactions yet.</Text>
-            )}
-          </View>
+        {/* Only the transaction list scrolls. */}
+        <ScrollView style={styles.flex} showsVerticalScrollIndicator={false} contentContainerStyle={styles.txnList}>
+          {isLoading ? (
+            <ActivityIndicator color={colors.green} style={{ marginTop: spacing(2) }} />
+          ) : txns.length > 0 ? (
+            txns.map((tx) => <TxnRow key={tx.id} tx={tx} />)
+          ) : (
+            <Text style={styles.empty}>No transactions yet.</Text>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -157,8 +163,8 @@ function TxnRow({ tx }: { tx: WalletTransaction }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: { paddingBottom: spacing(4) },
 
+  // Tall header; balance card overlaps its lower half.
   header: {
     backgroundColor: colors.heading,
     borderRadius: 26,
@@ -166,7 +172,7 @@ const styles = StyleSheet.create({
     marginTop: spacing(1),
     paddingHorizontal: spacing(2.5),
     paddingTop: spacing(2.5),
-    paddingBottom: spacing(2.5),
+    paddingBottom: spacing(7),
     overflow: "hidden",
   },
   blob: {
@@ -180,10 +186,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.white },
 
-  body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2) },
+  topBody: { paddingHorizontal: spacing(2.5) },
 
-  // Balance card
-  balanceCard: { borderRadius: 20, padding: spacing(2.5), overflow: "hidden" },
+  // Balance card — pulled up to overlap the header.
+  balanceCard: {
+    borderRadius: 20,
+    padding: spacing(2.5),
+    overflow: "hidden",
+    marginTop: -spacing(6),
+    zIndex: 1,
+  },
   balanceBlob: {
     position: "absolute",
     bottom: -50,
@@ -198,9 +210,9 @@ const styles = StyleSheet.create({
   brand: { fontFamily: fonts.bold, fontSize: 13, color: "rgba(255,255,255,0.85)" },
   balanceValue: { fontFamily: fonts.bold, fontSize: 34, color: colors.white, marginTop: spacing(1) },
 
-  sectionTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading, marginTop: spacing(3), marginBottom: spacing(1.5) },
+  sectionTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading, marginTop: spacing(2.5), marginBottom: spacing(1.5) },
 
-  // Add money
+  // Add money — Nunito Sans input.
   quickRow: { flexDirection: "row", gap: spacing(1.25) },
   quickChip: {
     flex: 1,
@@ -225,8 +237,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(1.5),
     height: 50,
   },
-  rupee: { fontFamily: fonts.semibold, fontSize: 16, color: colors.muted, marginRight: 4 },
-  amountInput: { flex: 1, fontFamily: fonts.semibold, fontSize: 16, color: colors.heading, paddingVertical: 0 },
+  rupee: { fontFamily: fontsAlt.bold, fontSize: 16, color: colors.muted, marginRight: 4 },
+  amountInput: { flex: 1, fontFamily: fontsAlt.semibold, fontSize: 16, color: colors.heading, paddingVertical: 0 },
   addBtn: {
     backgroundColor: colors.green,
     borderRadius: 12,
@@ -237,7 +249,8 @@ const styles = StyleSheet.create({
   },
   addText: { fontFamily: fonts.bold, fontSize: 15, color: colors.white },
 
-  // Transactions
+  // Transactions — Nunito Sans content.
+  txnList: { paddingHorizontal: spacing(2.5), paddingTop: spacing(0.5), paddingBottom: spacing(3) },
   empty: { fontFamily: fontsAlt.regular, fontSize: 14, color: colors.muted, marginTop: spacing(1) },
   txn: {
     flexDirection: "row",
@@ -251,7 +264,7 @@ const styles = StyleSheet.create({
   },
   txnIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   txnInfo: { flex: 1, marginLeft: spacing(1.5) },
-  txnTitle: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
+  txnTitle: { fontFamily: fontsAlt.bold, fontSize: 14, color: colors.heading },
   txnSub: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
-  txnAmount: { fontFamily: fonts.bold, fontSize: 15 },
+  txnAmount: { fontFamily: fontsAlt.bold, fontSize: 15 },
 });
