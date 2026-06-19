@@ -22,6 +22,12 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+const labelIcon = (label: string): IoniconName => {
+  const l = (label || "").toLowerCase();
+  if (l === "work") return "briefcase-outline";
+  if (l === "other") return "location-outline";
+  return "home-outline";
+};
 
 type Pay = { key: string; title: string; sub: string; icon: IoniconName; backend: string; tint: string; fg: string };
 const PAYMENTS: Pay[] = [
@@ -148,7 +154,7 @@ export default function CheckoutScreen() {
                       style={[styles.chip, active && styles.chipActive]}
                     >
                       <Ionicons
-                        name="home-outline"
+                        name={labelIcon(a.label)}
                         size={14}
                         color={active ? colors.green : colors.muted}
                       />
@@ -161,7 +167,7 @@ export default function CheckoutScreen() {
                 <View style={styles.addrCard}>
                   <View style={styles.addrTop}>
                     <View style={styles.addrIcon}>
-                      <Ionicons name="home-outline" size={16} color={colors.green} />
+                      <Ionicons name={labelIcon(selected.label)} size={16} color={colors.green} />
                     </View>
                     <Text style={styles.addrLabel}>{cap(selected.label)}</Text>
                     {selected.is_default ? (
