@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import {
@@ -64,6 +64,7 @@ export default function AddAddressScreen() {
   const [stateName, setStateName] = useState(existing?.state || "");
   const [pincode, setPincode] = useState(existing?.pincode || "");
   const [error, setError] = useState("");
+  const scrollRef = useRef<ScrollView>(null);
 
   const active = TYPES.find((t) => t.value === type);
 
@@ -100,9 +101,11 @@ export default function AddAddressScreen() {
     <Screen padded={false}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
+          ref={scrollRef}
+          style={styles.flex}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scroll}
@@ -175,6 +178,7 @@ export default function AddAddressScreen() {
               placeholder="6-digit pincode"
               keyboardType="number-pad"
               maxLength={6}
+              onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}

@@ -128,6 +128,11 @@ export type DeliverySlot = {
   is_full: boolean;
 };
 
+export type ServiceabilityResult = {
+  serviceable: boolean;
+  area: { name?: string; city?: string; delivery_eta_minutes: number | null } | null;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -275,6 +280,18 @@ export const api = createApi({
     deliverySlots: build.query<DeliverySlot[], void>({
       query: () => "/orders/delivery-slots/",
     }),
+    serviceabilityCheck: build.query<
+      ServiceabilityResult,
+      { pincode?: string; lat?: number; lng?: number }
+    >({
+      query: (arg) => {
+        const p: string[] = [];
+        if (arg.pincode) p.push(`pincode=${encodeURIComponent(arg.pincode)}`);
+        if (arg.lat != null) p.push(`lat=${arg.lat}`);
+        if (arg.lng != null) p.push(`lng=${arg.lng}`);
+        return `/serviceability/check/${p.length ? `?${p.join("&")}` : ""}`;
+      },
+    }),
     checkout: build.mutation<{ order_number: string }, { address_id: number; delivery_slot_id?: number }>({
       query: (body) => ({ url: "/orders/checkout/", method: "POST", body }),
       invalidatesTags: ["Cart"],
@@ -308,6 +325,7 @@ export const {
   useApplyCouponMutation,
   useRemoveCouponMutation,
   useDeliverySlotsQuery,
+  useServiceabilityCheckQuery,
   useCheckoutMutation,
   useInitiatePaymentMutation,
 } = api;
