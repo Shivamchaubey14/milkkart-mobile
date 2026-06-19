@@ -255,6 +255,35 @@ export const api = createApi({
     }),
     addToCart: build.mutation<Cart, { variant_id: number; quantity?: number }>({
       query: (body) => ({ url: "/cart/add/", method: "POST", body }),
+      // Optimistic: bump the quantity in the cached cart immediately so the
+      // stepper/badge respond instantly; the invalidation refetch corrects the
+      // bill (and replaces any temp line).
+      async onQueryStarted({ variant_id, quantity = 1 }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          api.util.updateQueryData("cart", undefined, (draft) => {
+            const item = draft.items.find((i) => i.variant === variant_id);
+            if (item) item.quantity += quantity;
+            else
+              draft.items.push({
+                id: -variant_id,
+                variant: variant_id,
+                quantity,
+                product_name: "",
+                product_slug: "",
+                image_url: "",
+                variant_label: "",
+                price: "0",
+                subtotal: "0",
+              });
+            draft.item_count = draft.items.reduce((s, i) => s + i.quantity, 0);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
       invalidatesTags: ["Cart"],
     }),
     updateCartItem: build.mutation<Cart, { item_id: number; quantity: number }>({
@@ -263,10 +292,37 @@ export const api = createApi({
         method: "PATCH",
         body: { quantity },
       }),
+      async onQueryStarted({ item_id, quantity }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          api.util.updateQueryData("cart", undefined, (draft) => {
+            const item = draft.items.find((i) => i.id === item_id);
+            if (item) item.quantity = quantity;
+            draft.item_count = draft.items.reduce((s, i) => s + i.quantity, 0);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
       invalidatesTags: ["Cart"],
     }),
     removeCartItem: build.mutation<unknown, number>({
       query: (item_id) => ({ url: `/cart/items/${item_id}/`, method: "DELETE" }),
+      async onQueryStarted(item_id, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          api.util.updateQueryData("cart", undefined, (draft) => {
+            draft.items = draft.items.filter((i) => i.id !== item_id);
+            draft.item_count = draft.items.reduce((s, i) => s + i.quantity, 0);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
       invalidatesTags: ["Cart"],
     }),
     applyCoupon: build.mutation<Cart, string>({
