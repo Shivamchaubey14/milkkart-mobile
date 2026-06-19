@@ -133,6 +133,22 @@ export type ServiceabilityResult = {
   area: { name?: string; city?: string; delivery_eta_minutes: number | null } | null;
 };
 
+export type WalletTransaction = {
+  id: number;
+  type: string;
+  amount: string;
+  signed_amount: string;
+  balance_after: string;
+  order_number: string | null;
+  description: string;
+  created_at: string;
+};
+
+export type Wallet = {
+  balance: string;
+  recent_transactions: WalletTransaction[];
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -179,7 +195,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -355,6 +371,21 @@ export const api = createApi({
     initiatePayment: build.mutation<unknown, { order_number: string; method: string }>({
       query: (body) => ({ url: "/payments/initiate/", method: "POST", body }),
     }),
+    wallet: build.query<Wallet, void>({
+      query: () => "/wallet/",
+      providesTags: ["Wallet"],
+    }),
+    walletTopup: build.mutation<{ topup_id: number; gateway: { order_id: string } }, number>({
+      query: (amount) => ({ url: "/wallet/topup/", method: "POST", body: { amount } }),
+    }),
+    walletMockPay: build.mutation<unknown, string>({
+      query: (gateway_order_id) => ({
+        url: "/wallet/topup/mock-pay/",
+        method: "POST",
+        body: { gateway_order_id },
+      }),
+      invalidatesTags: ["Wallet"],
+    }),
   }),
 });
 
@@ -384,4 +415,7 @@ export const {
   useServiceabilityCheckQuery,
   useCheckoutMutation,
   useInitiatePaymentMutation,
+  useWalletQuery,
+  useWalletTopupMutation,
+  useWalletMockPayMutation,
 } = api;

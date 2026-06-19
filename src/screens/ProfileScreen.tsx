@@ -113,11 +113,11 @@ export default function ProfileScreen() {
             <Pressable
               key={m.key}
               style={styles.item}
-              onPress={() =>
-                m.key === "profile"
-                  ? navigation.navigate("Account")
-                  : toast(`${m.title} — coming soon.`)
-              }
+              onPress={() => {
+                if (m.key === "profile") navigation.navigate("Account");
+                else if (m.key === "wallet") navigation.navigate("Wallet");
+                else toast(`${m.title} — coming soon.`);
+              }}
             >
               <View style={[styles.itemIcon, { backgroundColor: m.tint }]}>
                 <Ionicons name={m.icon} size={20} color={m.fg} />
