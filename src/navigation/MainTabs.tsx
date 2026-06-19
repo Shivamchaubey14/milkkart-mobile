@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
+import CartScreen from "../screens/CartScreen";
 import HomeScreen from "../screens/HomeScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
 import ProfileStack from "./ProfileStack";
@@ -23,7 +24,6 @@ const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
 
 const AlertsScreen = () => <PlaceholderScreen title="Alerts" icon="notifications-outline" />;
 const WishlistScreen = () => <PlaceholderScreen title="Wishlist" icon="heart-outline" />;
-const CartScreen = () => <PlaceholderScreen title="Cart" icon="cart-outline" />;
 
 export default function MainTabs() {
   const cartCount = useAppSelector((s) => selectCartCount(s.cart.items));

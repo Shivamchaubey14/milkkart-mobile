@@ -190,7 +190,16 @@ export default function ProductScreen() {
           <Pressable
             style={styles.addBtn}
             onPress={() => {
-              dispatch(addItem(product.id));
+              dispatch(
+                addItem({
+                  id: product.id,
+                  name: product.name,
+                  variantLabel: variant?.label ?? "",
+                  price,
+                  image: product.image_url,
+                  slug: product.slug,
+                }),
+              );
               toast("Added to cart.");
             }}
           >
