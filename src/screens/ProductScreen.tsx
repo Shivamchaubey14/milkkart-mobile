@@ -23,7 +23,8 @@ import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { useAppSelector } from "../store/hooks";
+import { addItem } from "../store/cartSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const BADGE_PINK = "#ff6b81";
@@ -46,6 +47,7 @@ function Stars({ value, size = 13 }: { value: number; size?: number }) {
 export default function ProductScreen() {
   const { slug } = useRoute<RouteProp<RootStackParamList, "Product">>().params;
   const toast = useToast();
+  const dispatch = useAppDispatch();
   const user = useAppSelector((s) => s.auth.user);
 
   const { data: product, isLoading } = useProductDetailQuery(slug);
@@ -185,7 +187,13 @@ export default function ProductScreen() {
           </View>
 
           {/* Actions — full-width Add to cart (no heart), then Subscribe & save */}
-          <Pressable style={styles.addBtn} onPress={() => toast("Added to cart.")}>
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => {
+              dispatch(addItem(product.id));
+              toast("Added to cart.");
+            }}
+          >
             <Ionicons name="cart-outline" size={18} color={colors.white} />
             <Text style={styles.addText}>Add to cart</Text>
           </Pressable>

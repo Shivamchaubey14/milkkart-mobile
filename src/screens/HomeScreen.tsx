@@ -10,7 +10,8 @@ import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { useAppSelector } from "../store/hooks";
+import { addItem, removeItem } from "../store/cartSlice";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const BADGE_PINK = "#ff6b81";
@@ -46,18 +47,12 @@ export default function HomeScreen() {
       : undefined;
   const { data: products, isFetching } = useProductsQuery(productArg);
 
-  const [cart, setCart] = useState<Record<number, number>>({});
+  const dispatch = useAppDispatch();
+  const cart = useAppSelector((s) => s.cart.items);
   const [wishlist, setWishlist] = useState<Record<number, boolean>>({});
 
-  const inc = (id: number) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
-  const dec = (id: number) =>
-    setCart((c) => {
-      const next = (c[id] || 0) - 1;
-      const copy = { ...c };
-      if (next <= 0) delete copy[id];
-      else copy[id] = next;
-      return copy;
-    });
+  const inc = (id: number) => dispatch(addItem(id));
+  const dec = (id: number) => dispatch(removeItem(id));
   const toggleWish = (id: number) => setWishlist((w) => ({ ...w, [id]: !w[id] }));
 
   return (

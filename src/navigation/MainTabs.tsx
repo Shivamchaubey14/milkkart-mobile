@@ -4,6 +4,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import HomeScreen from "../screens/HomeScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
 import ProfileStack from "./ProfileStack";
+import { selectCartCount } from "../store/cartSlice";
+import { useAppSelector } from "../store/hooks";
 import { colors, fonts } from "../theme";
 
 const Tab = createBottomTabNavigator();
@@ -24,6 +26,7 @@ const WishlistScreen = () => <PlaceholderScreen title="Wishlist" icon="heart-out
 const CartScreen = () => <PlaceholderScreen title="Cart" icon="cart-outline" />;
 
 export default function MainTabs() {
+  const cartCount = useAppSelector((s) => selectCartCount(s.cart.items));
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -46,7 +49,19 @@ export default function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Alerts" component={AlertsScreen} />
       <Tab.Screen name="Wishlist" component={WishlistScreen} />
-      <Tab.Screen name="Cart" component={CartScreen} />
+      <Tab.Screen
+        name="Cart"
+        component={CartScreen}
+        options={{
+          tabBarBadge: cartCount > 0 ? cartCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.green,
+            color: colors.white,
+            fontFamily: fonts.bold,
+            fontSize: 10,
+          },
+        }}
+      />
       <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
