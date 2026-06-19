@@ -119,6 +119,15 @@ export type Cart = {
   item_count: number;
 };
 
+export type DeliverySlot = {
+  id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  available: number;
+  is_full: boolean;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -263,6 +272,16 @@ export const api = createApi({
       query: () => ({ url: "/cart/remove-coupon/", method: "POST", body: {} }),
       invalidatesTags: ["Cart"],
     }),
+    deliverySlots: build.query<DeliverySlot[], void>({
+      query: () => "/orders/delivery-slots/",
+    }),
+    checkout: build.mutation<{ order_number: string }, { address_id: number; delivery_slot_id?: number }>({
+      query: (body) => ({ url: "/orders/checkout/", method: "POST", body }),
+      invalidatesTags: ["Cart"],
+    }),
+    initiatePayment: build.mutation<unknown, { order_number: string; method: string }>({
+      query: (body) => ({ url: "/payments/initiate/", method: "POST", body }),
+    }),
   }),
 });
 
@@ -288,4 +307,7 @@ export const {
   useRemoveCartItemMutation,
   useApplyCouponMutation,
   useRemoveCouponMutation,
+  useDeliverySlotsQuery,
+  useCheckoutMutation,
+  useInitiatePaymentMutation,
 } = api;

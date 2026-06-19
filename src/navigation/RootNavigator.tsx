@@ -1,6 +1,7 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import CheckoutScreen from "../screens/CheckoutScreen";
 import LoginScreen from "../screens/auth/LoginScreen";
 import ProductScreen from "../screens/ProductScreen";
 import { useAppSelector } from "../store/hooks";
@@ -10,6 +11,7 @@ export type RootStackParamList = {
   Main: undefined;
   Login: undefined;
   Product: { slug: string };
+  Checkout: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -27,6 +29,11 @@ export default function RootNavigator() {
             <Stack.Screen
               name="Product"
               component={ProductScreen}
+              options={{ animation: "slide_from_right" }}
+            />
+            <Stack.Screen
+              name="Checkout"
+              component={CheckoutScreen}
               options={{ animation: "slide_from_right" }}
             />
           </>
