@@ -22,6 +22,7 @@ import {
   useWalletQuery,
   useWalletTopupMutation,
 } from "../api/baseApi";
+import { GooglePayLogo, PaytmLogo, PhonePeLogo } from "../components/PaymentLogos";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
@@ -29,14 +30,24 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const QUICK = [100, 200, 500];
 
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-type UpiApp = { key: string; name: string; letter?: string; icon?: IoniconName; tint: string; fg: string };
+type UpiApp = { key: string; name: string };
 const UPI_APPS: UpiApp[] = [
-  { key: "gpay", name: "Google Pay", letter: "G", tint: "#e8f0fe", fg: "#4285F4" },
-  { key: "phonepe", name: "PhonePe", letter: "P", tint: "#efe6f7", fg: "#5f259f" },
-  { key: "paytm", name: "Paytm", letter: "P", tint: "#e6f3fc", fg: "#00baf2" },
-  { key: "other", name: "Other UPI App", icon: "apps-outline", tint: colors.lineSoft, fg: colors.heading },
+  { key: "gpay", name: "Google Pay" },
+  { key: "phonepe", name: "PhonePe" },
+  { key: "paytm", name: "Paytm" },
+  { key: "other", name: "Other UPI App" },
 ];
+
+function UpiLogo({ k }: { k: string }) {
+  if (k === "gpay") return <GooglePayLogo size={40} />;
+  if (k === "phonepe") return <PhonePeLogo size={40} />;
+  if (k === "paytm") return <PaytmLogo size={40} />;
+  return (
+    <View style={styles.otherBadge}>
+      <Ionicons name="apps-outline" size={18} color={colors.heading} />
+    </View>
+  );
+}
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -216,12 +227,8 @@ function AddMoneySheet({
 
         {UPI_APPS.map((app) => (
           <Pressable key={app.key} style={styles.upiRow} onPress={() => onPick(app)} disabled={loading}>
-            <View style={[styles.upiBadge, { backgroundColor: app.tint }]}>
-              {app.letter ? (
-                <Text style={[styles.upiLetter, { color: app.fg }]}>{app.letter}</Text>
-              ) : (
-                <Ionicons name={app.icon ?? "apps-outline"} size={18} color={app.fg} />
-              )}
+            <View style={styles.upiBadge}>
+              <UpiLogo k={app.key} />
             </View>
             <Text style={styles.upiName}>{app.name}</Text>
             {loading ? (
@@ -405,7 +412,14 @@ const styles = StyleSheet.create({
     padding: spacing(1.5),
     marginBottom: spacing(1.25),
   },
-  upiBadge: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: spacing(1.5) },
-  upiLetter: { fontFamily: fonts.bold, fontSize: 17 },
+  upiBadge: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginRight: spacing(1.5) },
+  otherBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.lineSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   upiName: { flex: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
 });
