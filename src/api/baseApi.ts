@@ -139,6 +139,7 @@ export type OrderSummary = {
   status: string;
   total: string;
   item_count: number;
+  item_names: string[];
   placed_at: string;
 };
 
