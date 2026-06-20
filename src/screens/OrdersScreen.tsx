@@ -1,64 +1,23 @@
 import { useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { OrderSummary, useOrdersQuery } from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
-const money = (n: number) => "₹" + n.toFixed(2);
+const money = (n: number | string) => "₹" + Number(n).toFixed(2);
+const TINTS = ["#f6efdf", "#e2ecf9", "#e6f5ec", "#fde2e4", "#efe6f7", "#e2f3f5"];
 
-type Status = "out_for_delivery" | "delivered" | "cancelled";
-type OrderRow = {
-  id: string;
-  status: Status;
-  date: string;
-  products: string[];
-  tints: string[];
-  extra: number;
-  total: number;
-  itemCount: number;
-};
-
-// Hardcoded for now — wired to the real orders API later.
-const ORDERS: OrderRow[] = [
-  {
-    id: "a91f02c4",
-    status: "out_for_delivery",
-    date: "19 Jun, 11:28",
-    products: ["Brown Bread", "Sandwich Bread"],
-    tints: ["#f6efdf", "#e2ecf9"],
-    extra: 0,
-    total: 92.9,
-    itemCount: 2,
-  },
-  {
-    id: "620b3ab8",
-    status: "delivered",
-    date: "18 Jun, 19:04",
-    products: ["Full Cream Milk", "Paneer"],
-    tints: ["#e6f5ec", "#fde2e4"],
-    extra: 1,
-    total: 113.75,
-    itemCount: 3,
-  },
-  {
-    id: "3f7c1d92",
-    status: "cancelled",
-    date: "15 Jun, 08:46",
-    products: ["Curd 500g"],
-    tints: ["#e2f3f5"],
-    extra: 0,
-    total: 40.0,
-    itemCount: 1,
-  },
-];
-
-const STATUS: Record<Status, { label: string; bg: string; fg: string }> = {
+const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
+  pending: { label: "PENDING", bg: "#fff4d6", fg: "#b98421" },
+  confirmed: { label: "CONFIRMED", bg: colors.greenTint, fg: colors.green },
   out_for_delivery: { label: "OUT FOR DELIVERY", bg: colors.greenTint, fg: colors.green },
   delivered: { label: "DELIVERED", bg: "#e8f2fc", fg: colors.info },
   cancelled: { label: "CANCELLED", bg: colors.errorTint, fg: colors.error },
 };
+const statusOf = (s: string) => STATUS[s] ?? { label: s.toUpperCase(), bg: colors.lineSoft, fg: colors.heading };
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -66,15 +25,29 @@ const FILTERS = [
   { key: "delivered", label: "Delivered" },
   { key: "cancelled", label: "Cancelled" },
 ];
-function matchesFilter(status: Status, filter: string) {
+const ACTIVE_STATUSES = ["pending", "confirmed", "out_for_delivery"];
+function matchesFilter(status: string, filter: string) {
   if (filter === "all") return true;
-  if (filter === "active") return status === "out_for_delivery";
+  if (filter === "active") return ACTIVE_STATUSES.includes(status);
   return status === filter;
 }
 
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  const day = d.getDate();
+  const mon = d.toLocaleDateString(undefined, { month: "short" });
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${day} ${mon}, ${time}`;
+}
+
 export default function OrdersScreen() {
+  const { data: orders, isLoading } = useOrdersQuery();
   const [filter, setFilter] = useState("all");
-  const visible = ORDERS.filter((o) => matchesFilter(o.status, filter));
+
+  const sorted = [...(orders ?? [])].sort(
+    (a, b) => new Date(b.placed_at).getTime() - new Date(a.placed_at).getTime(),
+  );
+  const visible = sorted.filter((o) => matchesFilter(o.status, filter));
 
   return (
     <Screen padded={false}>
@@ -82,7 +55,9 @@ export default function OrdersScreen() {
         <View style={styles.header}>
           <View style={styles.blob} />
           <Text style={styles.headerTitle}>My Orders</Text>
-          <Text style={styles.headerSub}>{ORDERS.length} orders placed</Text>
+          <Text style={styles.headerSub}>
+            {sorted.length} {sorted.length === 1 ? "order" : "orders"} placed
+          </Text>
         </View>
 
         <ScrollView
@@ -105,18 +80,24 @@ export default function OrdersScreen() {
           })}
         </ScrollView>
 
-        {visible.length === 0 ? (
+        {isLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={colors.green} />
+          </View>
+        ) : visible.length === 0 ? (
           <View style={styles.center}>
             <View style={styles.emptyBadge}>
               <Ionicons name="receipt-outline" size={34} color={colors.green} />
             </View>
-            <Text style={styles.emptyTitle}>No orders here</Text>
-            <Text style={styles.emptySub}>Try a different filter.</Text>
+            <Text style={styles.emptyTitle}>{sorted.length ? "No orders here" : "No orders yet"}</Text>
+            <Text style={styles.emptySub}>
+              {sorted.length ? "Try a different filter." : "Your orders will show up here."}
+            </Text>
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
-            {visible.map((o) => (
-              <OrderCard key={o.id} order={o} />
+            {visible.map((o, i) => (
+              <OrderCard key={o.id} order={o} index={i} />
             ))}
           </ScrollView>
         )}
@@ -125,11 +106,15 @@ export default function OrdersScreen() {
   );
 }
 
-function OrderCard({ order }: { order: OrderRow }) {
+function OrderCard({ order, index }: { order: OrderSummary; index: number }) {
   const toast = useToast();
   const scale = useRef(new Animated.Value(1)).current;
-  const s = STATUS[order.status];
+  const s = statusOf(order.status);
   const soon = (what: string) => () => toast(`${what} — coming soon.`);
+
+  const shown = Math.min(order.item_count, 2);
+  const extra = Math.max(0, order.item_count - 2);
+  const names = order.item_names?.length ? order.item_names.join(", ") : `${order.item_count} items`;
 
   return (
     <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
@@ -140,8 +125,8 @@ function OrderCard({ order }: { order: OrderRow }) {
       >
         <View style={styles.cardTop}>
           <View>
-            <Text style={styles.orderNo}>Order #{order.id}</Text>
-            <Text style={styles.date}>{order.date}</Text>
+            <Text style={styles.orderNo}>Order #{order.order_number.slice(0, 8)}</Text>
+            <Text style={styles.date}>{fmtDate(order.placed_at)}</Text>
           </View>
           <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
             <Text style={[styles.statusText, { color: s.fg }]}>{s.label}</Text>
@@ -152,27 +137,30 @@ function OrderCard({ order }: { order: OrderRow }) {
 
         <View style={styles.middle}>
           <View style={styles.thumbs}>
-            {order.tints.slice(0, 2).map((t, i) => (
-              <View key={i} style={[styles.thumb, { backgroundColor: t, marginLeft: i === 0 ? 0 : -14 }]} />
+            {Array.from({ length: shown }).map((_, i) => (
+              <View
+                key={i}
+                style={[styles.thumb, { backgroundColor: TINTS[(index + i) % TINTS.length], marginLeft: i === 0 ? 0 : -14 }]}
+              />
             ))}
-            {order.extra > 0 ? (
-              <View style={[styles.thumb, styles.thumbMore, { marginLeft: -14 }]}>
-                <Text style={styles.thumbMoreText}>+{order.extra}</Text>
+            {extra > 0 ? (
+              <View style={[styles.thumb, styles.thumbMore, { marginLeft: shown ? -14 : 0 }]}>
+                <Text style={styles.thumbMoreText}>+{extra}</Text>
               </View>
             ) : null}
           </View>
           <View style={styles.info}>
             <Text style={styles.names} numberOfLines={2}>
-              {order.products.join(", ")}
+              {names}
             </Text>
             <Text style={styles.priceItems}>
-              {money(order.total)} · {order.itemCount} {order.itemCount === 1 ? "item" : "items"}
+              {money(order.total)} · {order.item_count} {order.item_count === 1 ? "item" : "items"}
             </Text>
           </View>
           {order.status === "cancelled" ? <Text style={styles.refunded}>Refunded</Text> : null}
         </View>
 
-        {order.status === "out_for_delivery" ? (
+        {ACTIVE_STATUSES.includes(order.status) ? (
           <View style={styles.actions}>
             <ActionBtn label="Track Order" variant="outline" onPress={soon("Track Order")} />
             <ActionBtn label="Help" variant="soft" onPress={soon("Help")} />
