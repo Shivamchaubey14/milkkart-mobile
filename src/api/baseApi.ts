@@ -133,6 +133,15 @@ export type ServiceabilityResult = {
   area: { name?: string; city?: string; delivery_eta_minutes: number | null } | null;
 };
 
+export type OrderSummary = {
+  id: number;
+  order_number: string;
+  status: string;
+  total: string;
+  item_count: number;
+  placed_at: string;
+};
+
 export type WalletTransaction = {
   id: number;
   type: string;
@@ -195,7 +204,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -366,7 +375,11 @@ export const api = createApi({
     }),
     checkout: build.mutation<{ order_number: string }, { address_id: number; delivery_slot_id?: number }>({
       query: (body) => ({ url: "/orders/checkout/", method: "POST", body }),
-      invalidatesTags: ["Cart"],
+      invalidatesTags: ["Cart", "Order"],
+    }),
+    orders: build.query<OrderSummary[], void>({
+      query: () => "/orders/",
+      providesTags: ["Order"],
     }),
     initiatePayment: build.mutation<unknown, { order_number: string; method: string }>({
       query: (body) => ({ url: "/payments/initiate/", method: "POST", body }),
@@ -414,6 +427,7 @@ export const {
   useDeliverySlotsQuery,
   useServiceabilityCheckQuery,
   useCheckoutMutation,
+  useOrdersQuery,
   useInitiatePaymentMutation,
   useWalletQuery,
   useWalletTopupMutation,

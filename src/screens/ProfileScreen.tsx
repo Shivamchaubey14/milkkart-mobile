@@ -114,6 +114,7 @@ export default function ProfileScreen() {
               onPress={() => {
                 if (m.key === "profile") navigation.navigate("Account");
                 else if (m.key === "wallet") navigation.navigate("Wallet");
+                else if (m.key === "orders") navigation.navigate("Orders");
                 else toast(`${m.title} — coming soon.`);
               }}
             >
