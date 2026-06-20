@@ -140,6 +140,7 @@ export type OrderSummary = {
   total: string;
   item_count: number;
   item_names: string[];
+  item_images: string[];
   placed_at: string;
 };
 
@@ -150,6 +151,16 @@ export type OrderItemDetail = {
   product_price: string;
   quantity: number;
   subtotal: string;
+  image_url: string;
+};
+
+export type OrderAssignment = {
+  status: string;
+  rider_name: string;
+  rider_phone: string;
+  vehicle_number: string;
+  rider_lat: string | null;
+  rider_lng: string | null;
 };
 
 export type OrderDetail = {
@@ -166,6 +177,8 @@ export type OrderDetail = {
   address_snapshot: string;
   notes: string;
   items: OrderItemDetail[];
+  assignment: OrderAssignment | null;
+  destination: { lat: string; lng: string } | null;
   placed_at: string;
   updated_at: string;
 };

@@ -1,10 +1,23 @@
 import { useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import {
+  ActivityIndicator,
+  Animated,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { OrderSummary, useOrdersQuery } from "../api/baseApi";
+import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
@@ -41,6 +54,7 @@ function fmtDate(iso: string) {
 }
 
 export default function OrdersScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { data: orders, isLoading } = useOrdersQuery();
   const [filter, setFilter] = useState("all");
 
@@ -97,7 +111,12 @@ export default function OrdersScreen() {
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
             {visible.map((o, i) => (
-              <OrderCard key={o.id} order={o} index={i} />
+              <OrderCard
+                key={o.id}
+                order={o}
+                index={i}
+                onPress={() => navigation.navigate("OrderDetail", { orderNumber: o.order_number })}
+              />
             ))}
           </ScrollView>
         )}
@@ -106,7 +125,7 @@ export default function OrdersScreen() {
   );
 }
 
-function OrderCard({ order, index }: { order: OrderSummary; index: number }) {
+function OrderCard({ order, index, onPress }: { order: OrderSummary; index: number; onPress: () => void }) {
   const toast = useToast();
   const scale = useRef(new Animated.Value(1)).current;
   const s = statusOf(order.status);
@@ -119,6 +138,7 @@ function OrderCard({ order, index }: { order: OrderSummary; index: number }) {
   return (
     <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
       <Pressable
+        onPress={onPress}
         onPressIn={() => Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 40, bounciness: 0 }).start()}
         onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 6 }).start()}
         android_ripple={{ color: "rgba(59,183,126,0.06)" }}
@@ -137,12 +157,17 @@ function OrderCard({ order, index }: { order: OrderSummary; index: number }) {
 
         <View style={styles.middle}>
           <View style={styles.thumbs}>
-            {Array.from({ length: shown }).map((_, i) => (
-              <View
-                key={i}
-                style={[styles.thumb, { backgroundColor: TINTS[(index + i) % TINTS.length], marginLeft: i === 0 ? 0 : -14 }]}
-              />
-            ))}
+            {Array.from({ length: shown }).map((_, i) => {
+              const img = imageUrl(order.item_images?.[i]);
+              return (
+                <View
+                  key={i}
+                  style={[styles.thumb, { backgroundColor: TINTS[(index + i) % TINTS.length], marginLeft: i === 0 ? 0 : -14 }]}
+                >
+                  {img ? <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="contain" /> : null}
+                </View>
+              );
+            })}
             {extra > 0 ? (
               <View style={[styles.thumb, styles.thumbMore, { marginLeft: shown ? -14 : 0 }]}>
                 <Text style={styles.thumbMoreText}>+{extra}</Text>
@@ -286,7 +311,8 @@ const styles = StyleSheet.create({
 
   middle: { flexDirection: "row", alignItems: "center" },
   thumbs: { flexDirection: "row" },
-  thumb: { width: 44, height: 44, borderRadius: 10, borderWidth: 2, borderColor: colors.bg },
+  thumb: { width: 44, height: 44, borderRadius: 10, borderWidth: 2, borderColor: colors.bg, overflow: "hidden" },
+  thumbImg: { width: "100%", height: "100%" },
   thumbMore: { backgroundColor: colors.lineSoft, alignItems: "center", justifyContent: "center" },
   thumbMoreText: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
   info: { flex: 1, marginLeft: spacing(1.5) },
