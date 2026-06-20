@@ -142,6 +142,33 @@ export type OrderSummary = {
   placed_at: string;
 };
 
+export type OrderItemDetail = {
+  id: number;
+  product_name: string;
+  variant_label: string;
+  product_price: string;
+  quantity: number;
+  subtotal: string;
+};
+
+export type OrderDetail = {
+  id: number;
+  order_number: string;
+  status: string;
+  subtotal: string;
+  discount: string;
+  delivery_fee: string;
+  small_cart_fee: string;
+  tax: string;
+  total: string;
+  coupon_code: string | null;
+  address_snapshot: string;
+  notes: string;
+  items: OrderItemDetail[];
+  placed_at: string;
+  updated_at: string;
+};
+
 export type WalletTransaction = {
   id: number;
   type: string;
@@ -381,6 +408,9 @@ export const api = createApi({
       query: () => "/orders/",
       providesTags: ["Order"],
     }),
+    orderDetail: build.query<OrderDetail, string>({
+      query: (orderNumber) => `/orders/${orderNumber}/`,
+    }),
     initiatePayment: build.mutation<unknown, { order_number: string; method: string }>({
       query: (body) => ({ url: "/payments/initiate/", method: "POST", body }),
     }),
@@ -428,6 +458,7 @@ export const {
   useServiceabilityCheckQuery,
   useCheckoutMutation,
   useOrdersQuery,
+  useOrderDetailQuery,
   useInitiatePaymentMutation,
   useWalletQuery,
   useWalletTopupMutation,
