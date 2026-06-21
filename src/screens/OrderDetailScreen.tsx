@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useRoute } from "@react-navigation/native";
+import { useState } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { OrderItemDetail, useOrderDetailQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
+import TrackingMap from "../components/TrackingMap";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
@@ -46,6 +48,7 @@ export default function OrderDetailScreen() {
   const { orderNumber } = useRoute<RouteProp<ProfileStackParamList, "OrderDetail">>().params;
   const toast = useToast();
   const { data: order, isLoading } = useOrderDetailQuery(orderNumber);
+  const [eta, setEta] = useState("");
 
   if (isLoading || !order) {
     return (
@@ -62,13 +65,23 @@ export default function OrderDetailScreen() {
   const tracking = order.status === "out_for_delivery";
   const rider = order.assignment;
 
-  let etaText = "";
-  if (tracking && rider?.rider_lat && rider?.rider_lng && order.destination) {
-    const km = haversineKm(
-      { lat: Number(rider.rider_lat), lng: Number(rider.rider_lng) },
-      { lat: Number(order.destination.lat), lng: Number(order.destination.lng) },
-    );
-    etaText = `Rider ${km.toFixed(1)} km away · ~${Math.max(5, Math.round(km * 5))} min`;
+  // Live map shows only once we're out for delivery and have both endpoints.
+  const riderGeo =
+    rider?.rider_lat && rider?.rider_lng
+      ? { lat: Number(rider.rider_lat), lng: Number(rider.rider_lng) }
+      : null;
+  const destGeo = order.destination
+    ? { lat: Number(order.destination.lat), lng: Number(order.destination.lng) }
+    : null;
+  const showMap = tracking && !!riderGeo && !!destGeo;
+
+  // Straight-line ETA as the initial label until the map reports along-route ETA.
+  let initialEta = "Your order is on the way";
+  if (showMap) {
+    const km = haversineKm(riderGeo!, destGeo!);
+    initialEta = `Arriving in ~${Math.max(1, Math.round((km / 18) * 60))} min · ${
+      km < 1 ? Math.round(km * 1000) + " m" : km.toFixed(1) + " km"
+    } away`;
   }
 
   return (
@@ -94,19 +107,15 @@ export default function OrderDetailScreen() {
             </View>
           ) : (
             <>
-              {/* Tracking map placeholder */}
-              {tracking ? (
-                <View style={styles.map}>
-                  <View style={styles.route} />
-                  <View style={[styles.marker, styles.markerStart]}>
-                    <Ionicons name="bicycle" size={14} color={colors.white} />
-                  </View>
-                  <View style={[styles.marker, styles.markerEnd]}>
-                    <Ionicons name="home" size={12} color={colors.white} />
-                  </View>
-                  <View style={styles.mapPill}>
+              {/* Live tracking map (OSM tiles + OSRM road route, like the web) */}
+              {showMap ? (
+                <View style={styles.mapWrap}>
+                  <TrackingMap rider={riderGeo!} destination={destGeo!} onEta={setEta} />
+                  <View style={styles.mapPill} pointerEvents="none">
                     <View style={styles.dot} />
-                    <Text style={styles.mapPillText}>{etaText || "Your order is on the way"}</Text>
+                    <Text style={styles.mapPillText} numberOfLines={1}>
+                      {eta || initialEta}
+                    </Text>
                   </View>
                 </View>
               ) : null}
@@ -281,42 +290,29 @@ const styles = StyleSheet.create({
 
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2) },
 
-  // Map placeholder
-  map: {
-    height: 150,
-    borderRadius: 16,
-    backgroundColor: "#e6efe9",
-    overflow: "hidden",
-    justifyContent: "flex-end",
-  },
-  route: {
-    position: "absolute",
-    top: 40,
-    left: 50,
-    width: 200,
-    height: 60,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-    borderColor: colors.green,
-    borderStyle: "dashed",
-    borderTopLeftRadius: 40,
-  },
-  marker: { position: "absolute", width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.white },
-  markerStart: { top: 28, left: 38, backgroundColor: colors.green },
-  markerEnd: { top: 86, right: 36, backgroundColor: colors.heading },
+  // Live tracking map
+  mapWrap: { position: "relative" },
   mapPill: {
+    position: "absolute",
+    left: spacing(1.5),
+    bottom: spacing(1.5),
+    right: spacing(1.5),
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     alignSelf: "flex-start",
-    margin: spacing(1.5),
     backgroundColor: colors.white,
     borderRadius: 999,
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
-  mapPillText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.heading },
+  mapPillText: { flex: 1, fontFamily: fonts.semibold, fontSize: 12, color: colors.heading },
 
   card: {
     backgroundColor: colors.bg,
