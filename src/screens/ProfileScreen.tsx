@@ -3,6 +3,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { useWalletQuery } from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
@@ -57,7 +58,6 @@ const MENU: MenuItem[] = [
     fg: colors.heading,
     title: "Wallet",
     subtitle: "Balance & transactions",
-    value: "₹250",
   },
   {
     key: "support",
@@ -74,6 +74,7 @@ export default function ProfileScreen() {
   const dispatch = useAppDispatch();
   const toast = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
+  const { data: wallet } = useWalletQuery();
 
   const initial = (user?.name?.trim()?.[0] || "U").toUpperCase();
 
@@ -96,14 +97,11 @@ export default function ProfileScreen() {
               <Text style={styles.avatarText}>{initial}</Text>
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName} numberOfLines={1}>
+              <Text style={styles.userName} numberOfLines={2}>
                 {user?.name || "MilkKart user"}
               </Text>
               <Text style={styles.userPhone}>{user?.phone || ""}</Text>
             </View>
-            <Pressable style={styles.editBtn} hitSlop={8} onPress={() => toast("Edit profile — coming soon.")}>
-              <Ionicons name="pencil" size={15} color={colors.white} />
-            </Pressable>
           </View>
         </View>
 
@@ -113,11 +111,12 @@ export default function ProfileScreen() {
             <Pressable
               key={m.key}
               style={styles.item}
-              onPress={() =>
-                m.key === "profile"
-                  ? navigation.navigate("Account")
-                  : toast(`${m.title} — coming soon.`)
-              }
+              onPress={() => {
+                if (m.key === "profile") navigation.navigate("Account");
+                else if (m.key === "wallet") navigation.navigate("Wallet");
+                else if (m.key === "orders") navigation.navigate("Orders");
+                else toast(`${m.title} — coming soon.`);
+              }}
             >
               <View style={[styles.itemIcon, { backgroundColor: m.tint }]}>
                 <Ionicons name={m.icon} size={20} color={m.fg} />
@@ -133,7 +132,11 @@ export default function ProfileScreen() {
                   <Text style={styles.badgeText}>{m.badge}</Text>
                 </View>
               ) : null}
-              {m.value ? <Text style={styles.value}>{m.value}</Text> : null}
+              {m.key === "wallet" && wallet ? (
+                <Text style={styles.value}>₹{Number(wallet.balance).toFixed(2)}</Text>
+              ) : m.value ? (
+                <Text style={styles.value}>{m.value}</Text>
+              ) : null}
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
           ))}

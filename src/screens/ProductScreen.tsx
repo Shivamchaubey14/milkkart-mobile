@@ -16,9 +16,12 @@ import {
 
 import {
   useAddToCartMutation,
+  useCartQuery,
   useProductDetailQuery,
   useProductRatingsQuery,
+  useRemoveCartItemMutation,
   useSubmitProductRatingMutation,
+  useUpdateCartItemMutation,
 } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
@@ -47,7 +50,10 @@ function Stars({ value, size = 13 }: { value: number; size?: number }) {
 export default function ProductScreen() {
   const { slug } = useRoute<RouteProp<RootStackParamList, "Product">>().params;
   const toast = useToast();
+  const { data: cart } = useCartQuery();
   const [addToCart] = useAddToCartMutation();
+  const [updateCartItem] = useUpdateCartItemMutation();
+  const [removeCartItem] = useRemoveCartItemMutation();
   const user = useAppSelector((s) => s.auth.user);
 
   const { data: product, isLoading } = useProductDetailQuery(slug);
@@ -64,6 +70,9 @@ export default function ProductScreen() {
     product?.variants.find((v) => v.id === variantId) ||
     product?.variants.find((v) => v.is_default) ||
     product?.variants[0];
+
+  // The cart line for the selected variant (shows the stepper when present).
+  const cartItem = variant ? cart?.items.find((it) => it.variant === variant.id) : undefined;
 
   const distribution = useMemo(() => {
     const counts = [0, 0, 0, 0, 0]; // index 0 = 1 star … 4 = 5 stars
@@ -187,21 +196,35 @@ export default function ProductScreen() {
           </View>
 
           {/* Actions — full-width Add to cart (no heart), then Subscribe & save */}
-          <Pressable
-            style={styles.addBtn}
-            onPress={async () => {
-              if (!variant) return;
-              try {
-                await addToCart({ variant_id: variant.id }).unwrap();
-                toast("Added to cart.");
-              } catch {
-                toast("Couldn't add to cart.", "error");
-              }
-            }}
-          >
-            <Ionicons name="cart-outline" size={18} color={colors.white} />
-            <Text style={styles.addText}>Add to cart</Text>
-          </Pressable>
+          {cartItem ? (
+            <View style={styles.cartStepper}>
+              <Pressable
+                style={styles.cartStepBtn}
+                onPress={() =>
+                  cartItem.quantity <= 1
+                    ? removeCartItem(cartItem.id)
+                    : updateCartItem({ item_id: cartItem.id, quantity: cartItem.quantity - 1 })
+                }
+              >
+                <Ionicons name="remove" size={22} color={colors.white} />
+              </Pressable>
+              <Text style={styles.cartStepQty}>{cartItem.quantity} in cart</Text>
+              <Pressable
+                style={styles.cartStepBtn}
+                onPress={() => variant && addToCart({ variant_id: variant.id })}
+              >
+                <Ionicons name="add" size={22} color={colors.white} />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.addBtn}
+              onPress={() => variant && addToCart({ variant_id: variant.id })}
+            >
+              <Ionicons name="cart-outline" size={18} color={colors.white} />
+              <Text style={styles.addText}>Add to cart</Text>
+            </Pressable>
+          )}
           <Pressable style={styles.subBtn} onPress={() => toast("Subscribe & save — coming soon.")}>
             <Ionicons name="repeat-outline" size={18} color={colors.green} />
             <Text style={styles.subText}>Subscribe & save</Text>
@@ -366,6 +389,18 @@ const styles = StyleSheet.create({
     marginTop: spacing(2.5),
   },
   addText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
+  // In-cart stepper — same full-width footprint as the Add to cart button.
+  cartStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.green,
+    borderRadius: 14,
+    paddingHorizontal: spacing(1),
+    marginTop: spacing(2.5),
+  },
+  cartStepBtn: { width: 52, height: 52, alignItems: "center", justifyContent: "center" },
+  cartStepQty: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
   subBtn: {
     flexDirection: "row",
     alignItems: "center",

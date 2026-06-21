@@ -133,6 +133,72 @@ export type ServiceabilityResult = {
   area: { name?: string; city?: string; delivery_eta_minutes: number | null } | null;
 };
 
+export type OrderSummary = {
+  id: number;
+  order_number: string;
+  status: string;
+  total: string;
+  item_count: number;
+  item_names: string[];
+  item_images: string[];
+  placed_at: string;
+};
+
+export type OrderItemDetail = {
+  id: number;
+  product_name: string;
+  variant_label: string;
+  product_price: string;
+  quantity: number;
+  subtotal: string;
+  image_url: string;
+};
+
+export type OrderAssignment = {
+  status: string;
+  rider_name: string;
+  rider_phone: string;
+  vehicle_number: string;
+  rider_lat: string | null;
+  rider_lng: string | null;
+};
+
+export type OrderDetail = {
+  id: number;
+  order_number: string;
+  status: string;
+  subtotal: string;
+  discount: string;
+  delivery_fee: string;
+  small_cart_fee: string;
+  tax: string;
+  total: string;
+  coupon_code: string | null;
+  address_snapshot: string;
+  notes: string;
+  items: OrderItemDetail[];
+  assignment: OrderAssignment | null;
+  destination: { lat: string; lng: string } | null;
+  placed_at: string;
+  updated_at: string;
+};
+
+export type WalletTransaction = {
+  id: number;
+  type: string;
+  amount: string;
+  signed_amount: string;
+  balance_after: string;
+  order_number: string | null;
+  description: string;
+  created_at: string;
+};
+
+export type Wallet = {
+  balance: string;
+  recent_transactions: WalletTransaction[];
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -179,7 +245,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -255,6 +321,35 @@ export const api = createApi({
     }),
     addToCart: build.mutation<Cart, { variant_id: number; quantity?: number }>({
       query: (body) => ({ url: "/cart/add/", method: "POST", body }),
+      // Optimistic: bump the quantity in the cached cart immediately so the
+      // stepper/badge respond instantly; the invalidation refetch corrects the
+      // bill (and replaces any temp line).
+      async onQueryStarted({ variant_id, quantity = 1 }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          api.util.updateQueryData("cart", undefined, (draft) => {
+            const item = draft.items.find((i) => i.variant === variant_id);
+            if (item) item.quantity += quantity;
+            else
+              draft.items.push({
+                id: -variant_id,
+                variant: variant_id,
+                quantity,
+                product_name: "",
+                product_slug: "",
+                image_url: "",
+                variant_label: "",
+                price: "0",
+                subtotal: "0",
+              });
+            draft.item_count = draft.items.reduce((s, i) => s + i.quantity, 0);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
       invalidatesTags: ["Cart"],
     }),
     updateCartItem: build.mutation<Cart, { item_id: number; quantity: number }>({
@@ -263,10 +358,37 @@ export const api = createApi({
         method: "PATCH",
         body: { quantity },
       }),
+      async onQueryStarted({ item_id, quantity }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          api.util.updateQueryData("cart", undefined, (draft) => {
+            const item = draft.items.find((i) => i.id === item_id);
+            if (item) item.quantity = quantity;
+            draft.item_count = draft.items.reduce((s, i) => s + i.quantity, 0);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
       invalidatesTags: ["Cart"],
     }),
     removeCartItem: build.mutation<unknown, number>({
       query: (item_id) => ({ url: `/cart/items/${item_id}/`, method: "DELETE" }),
+      async onQueryStarted(item_id, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          api.util.updateQueryData("cart", undefined, (draft) => {
+            draft.items = draft.items.filter((i) => i.id !== item_id);
+            draft.item_count = draft.items.reduce((s, i) => s + i.quantity, 0);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
       invalidatesTags: ["Cart"],
     }),
     applyCoupon: build.mutation<Cart, string>({
@@ -294,10 +416,32 @@ export const api = createApi({
     }),
     checkout: build.mutation<{ order_number: string }, { address_id: number; delivery_slot_id?: number }>({
       query: (body) => ({ url: "/orders/checkout/", method: "POST", body }),
-      invalidatesTags: ["Cart"],
+      invalidatesTags: ["Cart", "Order"],
+    }),
+    orders: build.query<OrderSummary[], void>({
+      query: () => "/orders/",
+      providesTags: ["Order"],
+    }),
+    orderDetail: build.query<OrderDetail, string>({
+      query: (orderNumber) => `/orders/${orderNumber}/`,
     }),
     initiatePayment: build.mutation<unknown, { order_number: string; method: string }>({
       query: (body) => ({ url: "/payments/initiate/", method: "POST", body }),
+    }),
+    wallet: build.query<Wallet, void>({
+      query: () => "/wallet/",
+      providesTags: ["Wallet"],
+    }),
+    walletTopup: build.mutation<{ topup_id: number; gateway: { order_id: string } }, number>({
+      query: (amount) => ({ url: "/wallet/topup/", method: "POST", body: { amount } }),
+    }),
+    walletMockPay: build.mutation<unknown, string>({
+      query: (gateway_order_id) => ({
+        url: "/wallet/topup/mock-pay/",
+        method: "POST",
+        body: { gateway_order_id },
+      }),
+      invalidatesTags: ["Wallet"],
     }),
   }),
 });
@@ -327,5 +471,10 @@ export const {
   useDeliverySlotsQuery,
   useServiceabilityCheckQuery,
   useCheckoutMutation,
+  useOrdersQuery,
+  useOrderDetailQuery,
   useInitiatePaymentMutation,
+  useWalletQuery,
+  useWalletTopupMutation,
+  useWalletMockPayMutation,
 } = api;
