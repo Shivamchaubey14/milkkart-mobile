@@ -11,6 +11,8 @@ type Props = {
   destination: LatLng;
   /** Fired as the rider glides along the route, with a human ETA string. */
   onEta?: (text: string) => void;
+  /** Stretch to fill the parent (square corners) instead of the boxed 200px card. */
+  fill?: boolean;
 };
 
 // A keyless Leaflet map (OpenStreetMap raster tiles) that fetches a road route
@@ -139,7 +141,7 @@ function buildHtml(rider: LatLng, destination: LatLng) {
 </body></html>`;
 }
 
-export default function TrackingMap({ rider, destination, onEta }: Props) {
+export default function TrackingMap({ rider, destination, onEta, fill }: Props) {
   const onEtaRef = useRef(onEta);
   onEtaRef.current = onEta;
 
@@ -150,7 +152,7 @@ export default function TrackingMap({ rider, destination, onEta }: Props) {
   );
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, fill && styles.fill]}>
       <WebView
         originWhitelist={["*"]}
         source={{ html }}
@@ -174,5 +176,6 @@ export default function TrackingMap({ rider, destination, onEta }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { height: 200, borderRadius: 16, overflow: "hidden", backgroundColor: "#e6efe9" },
+  fill: { flex: 1, height: undefined, borderRadius: 0 },
   web: { flex: 1, backgroundColor: "transparent" },
 });

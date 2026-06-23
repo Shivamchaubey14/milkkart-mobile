@@ -116,6 +116,7 @@ export default function OrdersScreen() {
                 order={o}
                 index={i}
                 onPress={() => navigation.navigate("OrderDetail", { orderNumber: o.order_number })}
+                onTrack={() => navigation.navigate("TrackOrder", { orderNumber: o.order_number })}
               />
             ))}
           </ScrollView>
@@ -125,7 +126,17 @@ export default function OrdersScreen() {
   );
 }
 
-function OrderCard({ order, index, onPress }: { order: OrderSummary; index: number; onPress: () => void }) {
+function OrderCard({
+  order,
+  index,
+  onPress,
+  onTrack,
+}: {
+  order: OrderSummary;
+  index: number;
+  onPress: () => void;
+  onTrack: () => void;
+}) {
   const toast = useToast();
   const scale = useRef(new Animated.Value(1)).current;
   const s = statusOf(order.status);
@@ -187,7 +198,7 @@ function OrderCard({ order, index, onPress }: { order: OrderSummary; index: numb
 
         {ACTIVE_STATUSES.includes(order.status) ? (
           <View style={styles.actions}>
-            <ActionBtn label="Track Order" variant="outline" onPress={soon("Track Order")} />
+            <ActionBtn label="Track Order" variant="outline" onPress={onTrack} />
             <ActionBtn label="Help" variant="soft" onPress={soon("Help")} />
           </View>
         ) : order.status === "delivered" ? (
