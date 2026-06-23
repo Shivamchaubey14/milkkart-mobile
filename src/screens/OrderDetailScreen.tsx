@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { RouteProp, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -46,6 +47,7 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
 
 export default function OrderDetailScreen() {
   const { orderNumber } = useRoute<RouteProp<ProfileStackParamList, "OrderDetail">>().params;
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const toast = useToast();
   const { data: order, isLoading } = useOrderDetailQuery(orderNumber);
   const [eta, setEta] = useState("");
@@ -212,7 +214,11 @@ export default function OrderDetailScreen() {
             <View style={styles.actions}>
               <Pressable
                 style={({ pressed }) => [styles.trackBtn, pressed && { opacity: 0.85 }]}
-                onPress={() => toast("Live tracking — coming soon.")}
+                onPress={() =>
+                  order.status === "delivered"
+                    ? toast("Reorder — coming soon.")
+                    : navigation.navigate("TrackOrder", { orderNumber: order.order_number })
+                }
               >
                 <Text style={styles.trackText}>{order.status === "delivered" ? "Reorder" : "Track Order"}</Text>
               </Pressable>
