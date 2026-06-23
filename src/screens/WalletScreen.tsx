@@ -3,7 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Animated,
-  AppState,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -21,7 +20,7 @@ import * as IntentLauncher from "expo-intent-launcher";
 
 import {
   WalletTransaction,
-  useWalletMockPayMutation,
+  useLazyWalletTopupStatusQuery,
   useWalletQuery,
   useWalletTopupMutation,
 } from "../api/baseApi";
@@ -33,10 +32,10 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const QUICK = [100, 200, 500];
 
-// Merchant UPI details — the payee that collects the top-up. Set these to your
-// own registered VPA / business name to actually receive funds in production.
-const UPI_VPA = "milkkart@upi";
-const UPI_PAYEE_NAME = "MilkKart";
+// Status polling cadence — confirm the top-up server-side (works on every
+// platform). ~2 minutes at 3s, long enough to finish a UPI payment.
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_TRIES = 40;
 
 type UpiApp = { key: string; name: string; pkg?: string };
 // `pkg` is the Android package we target the UPI intent at; "Other" omits it so
@@ -47,21 +46,6 @@ const UPI_APPS: UpiApp[] = [
   { key: "paytm", name: "Paytm", pkg: "net.one97.paytm" },
   { key: "other", name: "Other UPI App" },
 ];
-
-// Build the UPI intent URL (NPCI spec params: pa=payee VPA, pn=name, am=amount,
-// cu=currency, tn=note, tr=merchant txn ref). `tr` is the gateway order id so we
-// can reconcile the payment on return.
-function buildUpiUrl(amount: number, ref: string) {
-  const params = [
-    `pa=${encodeURIComponent(UPI_VPA)}`,
-    `pn=${encodeURIComponent(UPI_PAYEE_NAME)}`,
-    `am=${amount}`,
-    `cu=INR`,
-    `tn=${encodeURIComponent("MilkKart wallet top-up")}`,
-    `tr=${encodeURIComponent(ref)}`,
-  ].join("&");
-  return `upi://pay?${params}`;
-}
 
 // UPI PSP apps return their result as intent extras (key "Status" or a "response"
 // blob like "txnId=...&Status=SUCCESS&..."). Normalise that to one word.
@@ -101,29 +85,15 @@ export default function WalletScreen() {
   const toast = useToast();
   const { data: wallet, isLoading, refetch } = useWalletQuery();
   const [topup] = useWalletTopupMutation();
-  const [mockPay] = useWalletMockPayMutation();
+  const [fetchStatus] = useLazyWalletTopupStatusQuery();
   const [amount, setAmount] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   // Which UPI app is currently being launched — so only that card spins.
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  // True while we poll the backend to confirm the payment (shows the overlay).
+  const [polling, setPolling] = useState(false);
+  const cancelPoll = useRef(false);
   const txns = wallet?.recent_transactions ?? [];
-
-  // iOS fallback only: Linking can't report a UPI result, so a return to the
-  // foreground is treated as the user backing out (Android reads the real result).
-  const awaitingReturn = useRef(false);
-  const onReturn = useRef<() => void>(() => {});
-  onReturn.current = () => {
-    if (!awaitingReturn.current) return;
-    awaitingReturn.current = false;
-    refetch();
-    toast("You canceled your top-up.", "info");
-  };
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (s) => {
-      if (s === "active") onReturn.current();
-    });
-    return () => sub.remove();
-  }, []);
 
   function openSheet() {
     const amt = parseFloat(amount);
@@ -134,68 +104,87 @@ export default function WalletScreen() {
     setSheetOpen(true);
   }
 
-  // Complete the gateway payment and credit the wallet (mock gateway in dev).
-  async function creditWallet(orderId: string, amt: number) {
-    try {
-      await mockPay(orderId).unwrap();
-      toast(`${money(amt)} added to your wallet.`);
-      setAmount("");
-    } catch (e: any) {
-      refetch();
-      toast(e?.data?.error || "Payment received — confirming your balance…", "info");
+  // Poll the backend until the top-up resolves — the single source of truth on
+  // every platform. A real gateway flips the status via its webhook.
+  async function pollStatus(topupId: number): Promise<"success" | "failed" | "timeout" | "canceled"> {
+    for (let i = 0; i < POLL_MAX_TRIES; i++) {
+      if (cancelPoll.current) return "canceled";
+      try {
+        const r = await fetchStatus(topupId).unwrap();
+        if (r.status === "success") return "success";
+        if (r.status === "failed") return "failed";
+      } catch {
+        /* transient network — keep polling */
+      }
+      await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS));
     }
+    return "timeout";
   }
 
-  // Android: launch the UPI app via an intent and read the result it returns.
-  async function payAndroid(app: UpiApp, url: string, orderId: string, amt: number) {
+  // Android: launch the chosen UPI app via an intent. Returns a hint from the
+  // app's result; the server poll is still the authority on whether we credit.
+  async function launchAndroidIntent(app: UpiApp, intent: string): Promise<"failed" | "launched" | "noapp"> {
     let result: IntentLauncher.IntentLauncherResult;
     try {
       result = await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
-        data: url,
+        data: intent,
         ...(app.pkg ? { packageName: app.pkg } : {}),
       });
     } catch {
-      // Targeted app not installed — retry without a package so the OS chooser shows.
       try {
-        result = await IntentLauncher.startActivityAsync("android.intent.action.VIEW", { data: url });
+        result = await IntentLauncher.startActivityAsync("android.intent.action.VIEW", { data: intent });
       } catch {
-        toast(`${app.name} isn't installed. Try another UPI app.`, "error");
-        return;
+        return "noapp";
       }
     }
     const status = parseUpiStatus(result);
-    if (status === "success") {
-      await creditWallet(orderId, amt);
-    } else if (status === "submitted" || status === "pending") {
-      refetch();
-      toast("Payment submitted — your balance will update once it's confirmed.", "info");
-    } else if (status === "failure" || status === "failed") {
-      toast("Your payment failed. No money was deducted.", "error");
-    } else {
-      toast("You canceled your top-up.", "info");
-    }
+    return status === "failure" || status === "failed" ? "failed" : "launched";
   }
 
-  // Create the top-up order, then hand off to the chosen UPI app.
+  // Create the top-up, hand off to the UPI app, then confirm server-side.
   async function launchUpi(app: UpiApp) {
     const amt = parseFloat(amount);
     if (!amt || amt < 1) return;
     setLoadingKey(app.key);
     try {
       const res = await topup(amt).unwrap();
-      const orderId = res.gateway.order_id;
-      const url = buildUpiUrl(amt, orderId);
+      const intent = res.upi.intent; // backend-built UPI URL (single source of truth)
       setSheetOpen(false);
+
       if (Platform.OS === "android") {
-        await payAndroid(app, url, orderId, amt);
+        const hint = await launchAndroidIntent(app, intent);
+        if (hint === "noapp") {
+          toast(`${app.name} isn't installed. Try another UPI app.`, "error");
+          return;
+        }
+        if (hint === "failed") {
+          toast("Your payment failed. No money was deducted.", "error");
+          return;
+        }
       } else {
-        // iOS: open the link and fall back to cancel-on-return detection.
         try {
-          await Linking.openURL(url);
-          awaitingReturn.current = true;
+          await Linking.openURL(intent);
         } catch {
           toast("No UPI app found to handle the payment.", "error");
+          return;
         }
+      }
+
+      // Confirm with the server — identical across iOS, Android (and web).
+      cancelPoll.current = false;
+      setPolling(true);
+      const outcome = await pollStatus(res.topup_id);
+      setPolling(false);
+      refetch();
+      if (outcome === "success") {
+        toast(`${money(amt)} added to your wallet.`);
+        setAmount("");
+      } else if (outcome === "failed") {
+        toast("Your payment failed. No money was deducted.", "error");
+      } else if (outcome === "canceled") {
+        toast("You canceled your top-up.", "info");
+      } else {
+        toast("We haven't received your payment yet — it'll reflect once confirmed.", "info");
       }
     } catch (e: any) {
       toast(e?.data?.error || "The top-up couldn't start. Please try again.", "error");
@@ -283,6 +272,29 @@ export default function WalletScreen() {
         onClose={() => setSheetOpen(false)}
         onPick={launchUpi}
       />
+
+      {/* Blocking overlay while we confirm the payment server-side. */}
+      <Modal transparent visible={polling} animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+        <View style={styles.pollBackdrop}>
+          <View style={styles.pollCard}>
+            <ActivityIndicator size="large" color={colors.green} />
+            <Text style={styles.pollTitle}>Confirming your payment…</Text>
+            <Text style={styles.pollSub}>
+              Finish the payment in your UPI app. Your balance updates automatically once it's received.
+            </Text>
+            <Pressable
+              style={styles.pollCancel}
+              onPress={() => {
+                cancelPoll.current = true;
+                setPolling(false);
+              }}
+              hitSlop={6}
+            >
+              <Text style={styles.pollCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -548,4 +560,32 @@ const styles = StyleSheet.create({
   },
   upiRowBusy: { borderColor: colors.green, backgroundColor: colors.greenTint },
   upiName: { flex: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+
+  // Payment-confirmation overlay
+  pollBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(37,61,78,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing(3),
+  },
+  pollCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: colors.bg,
+    borderRadius: 20,
+    padding: spacing(3),
+    alignItems: "center",
+  },
+  pollTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.heading, marginTop: spacing(2) },
+  pollSub: {
+    fontFamily: fontsAlt.regular,
+    fontSize: 13,
+    color: colors.muted,
+    textAlign: "center",
+    lineHeight: 19,
+    marginTop: spacing(1),
+  },
+  pollCancel: { marginTop: spacing(2.5), paddingVertical: spacing(1), paddingHorizontal: spacing(3) },
+  pollCancelText: { fontFamily: fonts.bold, fontSize: 15, color: colors.muted },
 });

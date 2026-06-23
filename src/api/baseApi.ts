@@ -199,6 +199,21 @@ export type Wallet = {
   recent_transactions: WalletTransaction[];
 };
 
+export type WalletTopupCreated = {
+  topup_id: number;
+  amount: string;
+  status: string;
+  // Gateway-agnostic UPI intent/QR built by the backend (single source of truth).
+  upi: { intent: string; vpa: string; payee_name: string };
+  gateway: { provider: string; key_id: string; order_id: string; amount: number; currency: string };
+};
+
+export type WalletTopupStatus = {
+  topup_id: number;
+  status: "created" | "success" | "failed";
+  wallet: Wallet;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -432,8 +447,13 @@ export const api = createApi({
       query: () => "/wallet/",
       providesTags: ["Wallet"],
     }),
-    walletTopup: build.mutation<{ topup_id: number; gateway: { order_id: string } }, number>({
+    walletTopup: build.mutation<WalletTopupCreated, number>({
       query: (amount) => ({ url: "/wallet/topup/", method: "POST", body: { amount } }),
+    }),
+    // Poll the top-up's status — the source of truth across web/iOS/Android. A
+    // real gateway confirms via webhook; the response carries the fresh wallet.
+    walletTopupStatus: build.query<WalletTopupStatus, number>({
+      query: (topupId) => `/wallet/topup/${topupId}/status/`,
     }),
     walletMockPay: build.mutation<unknown, string>({
       query: (gateway_order_id) => ({
@@ -476,5 +496,6 @@ export const {
   useInitiatePaymentMutation,
   useWalletQuery,
   useWalletTopupMutation,
+  useLazyWalletTopupStatusQuery,
   useWalletMockPayMutation,
 } = api;
