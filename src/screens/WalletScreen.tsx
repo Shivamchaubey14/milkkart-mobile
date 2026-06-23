@@ -3,7 +3,9 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -15,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import * as IntentLauncher from "expo-intent-launcher";
 
 import {
   WalletTransaction,
@@ -30,13 +33,50 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const QUICK = [100, 200, 500];
 
-type UpiApp = { key: string; name: string };
+// Merchant UPI details — the payee that collects the top-up. Set these to your
+// own registered VPA / business name to actually receive funds in production.
+const UPI_VPA = "milkkart@upi";
+const UPI_PAYEE_NAME = "MilkKart";
+
+type UpiApp = { key: string; name: string; pkg?: string };
+// `pkg` is the Android package we target the UPI intent at; "Other" omits it so
+// the system shows its UPI app chooser.
 const UPI_APPS: UpiApp[] = [
-  { key: "gpay", name: "Google Pay" },
-  { key: "phonepe", name: "PhonePe" },
-  { key: "paytm", name: "Paytm" },
+  { key: "gpay", name: "Google Pay", pkg: "com.google.android.apps.nbu.paisa.user" },
+  { key: "phonepe", name: "PhonePe", pkg: "com.phonepe.app" },
+  { key: "paytm", name: "Paytm", pkg: "net.one97.paytm" },
   { key: "other", name: "Other UPI App" },
 ];
+
+// Build the UPI intent URL (NPCI spec params: pa=payee VPA, pn=name, am=amount,
+// cu=currency, tn=note, tr=merchant txn ref). `tr` is the gateway order id so we
+// can reconcile the payment on return.
+function buildUpiUrl(amount: number, ref: string) {
+  const params = [
+    `pa=${encodeURIComponent(UPI_VPA)}`,
+    `pn=${encodeURIComponent(UPI_PAYEE_NAME)}`,
+    `am=${amount}`,
+    `cu=INR`,
+    `tn=${encodeURIComponent("MilkKart wallet top-up")}`,
+    `tr=${encodeURIComponent(ref)}`,
+  ].join("&");
+  return `upi://pay?${params}`;
+}
+
+// UPI PSP apps return their result as intent extras (key "Status" or a "response"
+// blob like "txnId=...&Status=SUCCESS&..."). Normalise that to one word.
+function parseUpiStatus(result: IntentLauncher.IntentLauncherResult): string {
+  const extra = (result.extra ?? {}) as Record<string, unknown>;
+  const statusKey = Object.keys(extra).find((k) => k.toLowerCase() === "status");
+  let status = statusKey ? String(extra[statusKey]) : "";
+  if (!status) {
+    const respKey = Object.keys(extra).find((k) => k.toLowerCase() === "response");
+    const resp = respKey ? String(extra[respKey]) : String((result as { data?: string }).data ?? "");
+    const m = /status=([a-zA-Z]+)/.exec(resp);
+    if (m) status = m[1];
+  }
+  return status.toLowerCase();
+}
 
 function UpiLogo({ k }: { k: string }) {
   if (k === "gpay") return <GooglePayLogo size={40} />;
@@ -59,13 +99,31 @@ function fmtDate(iso: string) {
 
 export default function WalletScreen() {
   const toast = useToast();
-  const { data: wallet, isLoading } = useWalletQuery();
-  const [topup, { isLoading: t1 }] = useWalletTopupMutation();
-  const [mockPay, { isLoading: t2 }] = useWalletMockPayMutation();
+  const { data: wallet, isLoading, refetch } = useWalletQuery();
+  const [topup] = useWalletTopupMutation();
+  const [mockPay] = useWalletMockPayMutation();
   const [amount, setAmount] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
-  const adding = t1 || t2;
+  // Which UPI app is currently being launched — so only that card spins.
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const txns = wallet?.recent_transactions ?? [];
+
+  // iOS fallback only: Linking can't report a UPI result, so a return to the
+  // foreground is treated as the user backing out (Android reads the real result).
+  const awaitingReturn = useRef(false);
+  const onReturn = useRef<() => void>(() => {});
+  onReturn.current = () => {
+    if (!awaitingReturn.current) return;
+    awaitingReturn.current = false;
+    refetch();
+    toast("You canceled your top-up.", "info");
+  };
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") onReturn.current();
+    });
+    return () => sub.remove();
+  }, []);
 
   function openSheet() {
     const amt = parseFloat(amount);
@@ -76,16 +134,73 @@ export default function WalletScreen() {
     setSheetOpen(true);
   }
 
-  async function pay() {
-    const amt = parseFloat(amount);
+  // Complete the gateway payment and credit the wallet (mock gateway in dev).
+  async function creditWallet(orderId: string, amt: number) {
     try {
-      const res = await topup(amt).unwrap();
-      await mockPay(res.gateway.order_id).unwrap();
+      await mockPay(orderId).unwrap();
       toast(`${money(amt)} added to your wallet.`);
       setAmount("");
-      setSheetOpen(false);
     } catch (e: any) {
-      toast(e?.data?.error || "Online top-up needs the payment gateway (coming soon).", "error");
+      refetch();
+      toast(e?.data?.error || "Payment received — confirming your balance…", "info");
+    }
+  }
+
+  // Android: launch the UPI app via an intent and read the result it returns.
+  async function payAndroid(app: UpiApp, url: string, orderId: string, amt: number) {
+    let result: IntentLauncher.IntentLauncherResult;
+    try {
+      result = await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+        data: url,
+        ...(app.pkg ? { packageName: app.pkg } : {}),
+      });
+    } catch {
+      // Targeted app not installed — retry without a package so the OS chooser shows.
+      try {
+        result = await IntentLauncher.startActivityAsync("android.intent.action.VIEW", { data: url });
+      } catch {
+        toast(`${app.name} isn't installed. Try another UPI app.`, "error");
+        return;
+      }
+    }
+    const status = parseUpiStatus(result);
+    if (status === "success") {
+      await creditWallet(orderId, amt);
+    } else if (status === "submitted" || status === "pending") {
+      refetch();
+      toast("Payment submitted — your balance will update once it's confirmed.", "info");
+    } else if (status === "failure" || status === "failed") {
+      toast("Your payment failed. No money was deducted.", "error");
+    } else {
+      toast("You canceled your top-up.", "info");
+    }
+  }
+
+  // Create the top-up order, then hand off to the chosen UPI app.
+  async function launchUpi(app: UpiApp) {
+    const amt = parseFloat(amount);
+    if (!amt || amt < 1) return;
+    setLoadingKey(app.key);
+    try {
+      const res = await topup(amt).unwrap();
+      const orderId = res.gateway.order_id;
+      const url = buildUpiUrl(amt, orderId);
+      setSheetOpen(false);
+      if (Platform.OS === "android") {
+        await payAndroid(app, url, orderId, amt);
+      } else {
+        // iOS: open the link and fall back to cancel-on-return detection.
+        try {
+          await Linking.openURL(url);
+          awaitingReturn.current = true;
+        } catch {
+          toast("No UPI app found to handle the payment.", "error");
+        }
+      }
+    } catch (e: any) {
+      toast(e?.data?.error || "The top-up couldn't start. Please try again.", "error");
+    } finally {
+      setLoadingKey(null);
     }
   }
 
@@ -146,7 +261,7 @@ export default function WalletScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.sectionTitle}>Transaction History</Text>
+          <Text style={[styles.sectionTitle, styles.historyTitle]}>Transaction History</Text>
         </View>
 
         {/* Only the transaction list scrolls. */}
@@ -164,9 +279,9 @@ export default function WalletScreen() {
       <AddMoneySheet
         visible={sheetOpen}
         amount={amount}
-        loading={adding}
+        loadingKey={loadingKey}
         onClose={() => setSheetOpen(false)}
-        onPick={pay}
+        onPick={launchUpi}
       />
     </Screen>
   );
@@ -175,13 +290,13 @@ export default function WalletScreen() {
 function AddMoneySheet({
   visible,
   amount,
-  loading,
+  loadingKey,
   onClose,
   onPick,
 }: {
   visible: boolean;
   amount: string;
-  loading: boolean;
+  loadingKey: string | null;
   onClose: () => void;
   onPick: (app: UpiApp) => void;
 }) {
@@ -225,19 +340,27 @@ function AddMoneySheet({
         </View>
         <Text style={styles.sheetSub}>Choose a UPI app to pay</Text>
 
-        {UPI_APPS.map((app) => (
-          <Pressable key={app.key} style={styles.upiRow} onPress={() => onPick(app)} disabled={loading}>
-            <View style={styles.upiBadge}>
-              <UpiLogo k={app.key} />
-            </View>
-            <Text style={styles.upiName}>{app.name}</Text>
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.green} />
-            ) : (
-              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-            )}
-          </Pressable>
-        ))}
+        {UPI_APPS.map((app) => {
+          const busy = loadingKey === app.key;
+          return (
+            <Pressable
+              key={app.key}
+              style={[styles.upiRow, busy && styles.upiRowBusy]}
+              onPress={() => onPick(app)}
+              disabled={!!loadingKey}
+            >
+              <View style={styles.upiBadge}>
+                <UpiLogo k={app.key} />
+              </View>
+              <Text style={styles.upiName}>{app.name}</Text>
+              {busy ? (
+                <ActivityIndicator size="small" color={colors.green} />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+              )}
+            </Pressable>
+          );
+        })}
       </Animated.View>
     </Modal>
   );
@@ -297,12 +420,12 @@ const styles = StyleSheet.create({
 
   topBody: { paddingHorizontal: spacing(2.5) },
 
-  // Balance card — pulled up to overlap the header.
+  // Balance card — pulled up to overlap the header (a touch lower & smaller now).
   balanceCard: {
     borderRadius: 20,
-    padding: spacing(2.5),
+    padding: spacing(2.25),
     overflow: "hidden",
-    marginTop: -spacing(6),
+    marginTop: -spacing(4.5),
     zIndex: 1,
   },
   balanceBlob: {
@@ -317,9 +440,11 @@ const styles = StyleSheet.create({
   balanceTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   balanceLabel: { fontFamily: fontsAlt.regular, fontSize: 13, color: "rgba(255,255,255,0.9)" },
   brand: { fontFamily: fonts.bold, fontSize: 13, color: "rgba(255,255,255,0.85)" },
-  balanceValue: { fontFamily: fonts.bold, fontSize: 34, color: colors.white, marginTop: spacing(1) },
+  balanceValue: { fontFamily: fonts.bold, fontSize: 30, color: colors.white, marginTop: spacing(0.75) },
 
   sectionTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading, marginTop: spacing(2.5), marginBottom: spacing(1.5) },
+  // Extra gap so the "Transaction History" heading clears the Add-money row above.
+  historyTitle: { marginTop: spacing(3.25) },
 
   // Add money — Nunito Sans input.
   quickRow: { flexDirection: "row", gap: spacing(1.25) },
@@ -421,5 +546,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  upiRowBusy: { borderColor: colors.green, backgroundColor: colors.greenTint },
   upiName: { flex: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
 });
