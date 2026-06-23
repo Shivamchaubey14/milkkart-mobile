@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -25,6 +26,14 @@ function apiError(e: any): string {
   return e?.data?.error || e?.data?.detail || "Something went wrong. Check your connection.";
 }
 
+// Seconds → "mm:ss" for the resend countdown.
+function mmss(s: number): string {
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+const RESEND_SECONDS = 30;
+const OTP_LEN = 6;
+
 // Selling points shown as pills inside the green hero card.
 const FEATURES: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
   { icon: "flash", label: "30-min\ndelivery" },
@@ -43,6 +52,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [resendIn, setResendIn] = useState(0);
 
   const [sendOtp, { isLoading: sending }] = useSendOtpMutation();
   const [verifyOtp, { isLoading: verifying }] = useVerifyOtpMutation();
@@ -50,9 +60,19 @@ export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const toast = useToast();
   const insets = useSafeAreaInsets();
+  const codeRef = useRef<TextInput>(null);
 
   // The field holds the 10-digit national number; the backend wants E.164.
   const fullPhone = `+91${phone.trim()}`;
+  // Grouped for display: "+91 99190 75588".
+  const prettyPhone = `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`.trimEnd();
+
+  // Tick the resend countdown down to zero while on the OTP step.
+  useEffect(() => {
+    if (step !== "otp" || resendIn <= 0) return;
+    const id = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [step, resendIn]);
 
   async function onSend() {
     setError("");
@@ -63,10 +83,31 @@ export default function LoginScreen() {
     try {
       await sendOtp({ phone: fullPhone }).unwrap();
       setStep("otp");
+      setResendIn(RESEND_SECONDS);
       toast("OTP Sent! Check your inbox — we've also sent it to your email too.");
     } catch (e) {
       setError(apiError(e));
     }
+  }
+
+  async function onResend() {
+    if (resendIn > 0) return;
+    setError("");
+    try {
+      await sendOtp({ phone: fullPhone }).unwrap();
+      setCode("");
+      setResendIn(RESEND_SECONDS);
+      toast("Code resent — check your messages.");
+    } catch (e) {
+      setError(apiError(e));
+    }
+  }
+
+  function backToPhone() {
+    setStep("phone");
+    setCode("");
+    setError("");
+    setResendIn(0);
   }
 
   async function onVerify() {
@@ -117,11 +158,14 @@ export default function LoginScreen() {
             <Text style={styles.heroTitle}>
               {step === "phone" ? "Welcome back to\nfresh mornings" : "Verify your\nnumber"}
             </Text>
-            <Text style={styles.heroSubtitle}>
-              {step === "phone"
-                ? "Fresh dairy products, delivered fast."
-                : `Enter the 6-digit code we sent to ${fullPhone}.`}
-            </Text>
+            {step === "phone" ? (
+              <Text style={styles.heroSubtitle}>Fresh dairy products, delivered fast.</Text>
+            ) : (
+              <Text style={styles.heroSubtitle}>
+                Enter the 6-digit code we sent to{"\n"}
+                <Text style={styles.heroSubtitleStrong}>{prettyPhone}</Text>
+              </Text>
+            )}
 
             {step === "phone" ? (
               <View style={styles.featureRow}>
@@ -199,39 +243,100 @@ export default function LoginScreen() {
               </>
             ) : (
               <>
+                {/* Where the code went — with a quick Edit back to the number. */}
+                <View style={styles.sentCard}>
+                  <View style={styles.sentIcon}>
+                    <Ionicons name="call" size={16} color={colors.green} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.sentLabel}>Code sent to</Text>
+                    <Text style={styles.sentPhone}>{prettyPhone}</Text>
+                  </View>
+                  <Pressable onPress={backToPhone} hitSlop={8}>
+                    <Text style={styles.editLink}>Edit</Text>
+                  </Pressable>
+                </View>
+
                 <Text style={styles.label}>Enter the 6-digit code</Text>
-                <View style={styles.codeRow}>
+
+                {/* Six segmented boxes backed by one hidden input. Tapping the
+                    row focuses it; the boxes mirror each typed digit. */}
+                <Pressable style={styles.otpRow} onPress={() => codeRef.current?.focus()}>
+                  {Array.from({ length: OTP_LEN }, (_, i) => {
+                    const char = code[i] ?? "";
+                    const active = i === code.length;
+                    return (
+                      <View
+                        key={i}
+                        style={[
+                          styles.otpBox,
+                          char ? styles.otpBoxFilled : null,
+                          active ? styles.otpBoxActive : null,
+                        ]}
+                      >
+                        {char ? (
+                          <Text style={styles.otpDigit}>{char}</Text>
+                        ) : active ? (
+                          <View style={styles.otpCaret} />
+                        ) : null}
+                      </View>
+                    );
+                  })}
                   <TextInput
-                    style={styles.codeInput}
+                    ref={codeRef}
+                    style={styles.otpHiddenInput}
                     value={code}
-                    onChangeText={(t) => setCode(t.replace(/[^0-9]/g, "").slice(0, 6))}
-                    placeholder="••••••"
-                    placeholderTextColor={colors.muted}
+                    onChangeText={(t) => setCode(t.replace(/[^0-9]/g, "").slice(0, OTP_LEN))}
                     keyboardType="number-pad"
-                    maxLength={6}
-                    textAlign="center"
+                    maxLength={OTP_LEN}
+                    textContentType="oneTimeCode"
+                    autoComplete="sms-otp"
+                    caretHidden
                     autoFocus
                   />
+                </Pressable>
+
+                {/* Resend countdown. */}
+                <View style={styles.resendRow}>
+                  <View style={styles.resendLeft}>
+                    <Ionicons name="refresh" size={14} color={colors.muted} />
+                    <Text style={styles.resendText}>
+                      {resendIn > 0 ? `Resend code in ${mmss(resendIn)}` : "Didn't receive the code?"}
+                    </Text>
+                  </View>
+                  <Pressable onPress={onResend} disabled={resendIn > 0} hitSlop={8}>
+                    <Text style={[styles.resendLink, resendIn > 0 && styles.resendLinkOff]}>Resend</Text>
+                  </Pressable>
                 </View>
+
                 {error ? <Text style={styles.error}>{error}</Text> : null}
+
                 <Button
-                  title="Verify & Continue"
+                  title="Verify & Continue  →"
                   onPress={onVerify}
                   loading={verifying}
                   style={styles.cta}
                 />
-                <Button
-                  title="Use a different number"
-                  variant="ghost"
-                  onPress={() => {
-                    setStep("phone");
-                    setCode("");
-                    setError("");
-                  }}
-                  style={{ marginTop: spacing(1) }}
-                />
-                <Text style={styles.helper}>
-                  Your one-time code is emailed to you. In dev it's also printed in the backend logs.
+                <Button title="Use a different number" variant="ghost" onPress={backToPhone} style={styles.ghostCta} />
+
+                <View style={styles.otpSpacer} />
+
+                {/* Help card. */}
+                <View style={styles.hairline} />
+                <View style={styles.helpCard}>
+                  <View style={styles.helpIcon}>
+                    <Ionicons name="help-circle-outline" size={18} color={colors.green} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.helpTitle}>Didn't get the code?</Text>
+                    <Text style={styles.helpSub}>Check your SMS or try resending in a moment</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.terms}>
+                  By continuing you agree to our{"\n"}
+                  <Text style={styles.termsLink}>Terms of Service</Text> &{" "}
+                  <Text style={styles.termsLink}>Privacy Policy</Text>
                 </Text>
               </>
             )}
@@ -315,9 +420,10 @@ const styles = StyleSheet.create({
     fontSize: font.small,
     color: "rgba(255,255,255,0.92)",
     marginTop: spacing(1),
-    maxWidth: "82%",
-    lineHeight: 19,
+    maxWidth: "86%",
+    lineHeight: 20,
   },
+  heroSubtitleStrong: { fontFamily: fonts.bold, color: colors.white, fontSize: font.body },
 
   // Feature pills inside the hero.
   featureRow: { flexDirection: "row", gap: spacing(1), marginTop: spacing(2) },
@@ -382,23 +488,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(1),
     letterSpacing: 0.5,
   },
-  // OTP code field — same green-bordered look as the phone field, centered.
-  codeRow: {
-    borderWidth: 1.5,
-    borderColor: colors.green,
+  // OTP step ----------------------------------------------------------------
+  // "Code sent to" card.
+  sentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1.25),
+    backgroundColor: colors.bgSoft,
     borderRadius: 14,
-    backgroundColor: colors.bg,
-    minHeight: 56,
+    paddingVertical: spacing(1.25),
+    paddingHorizontal: spacing(1.5),
+    marginBottom: spacing(2),
+  },
+  sentIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.greenTint,
+    alignItems: "center",
     justifyContent: "center",
   },
-  codeInput: {
-    fontFamily: fonts.bold,
-    fontSize: 22,
-    color: colors.heading,
-    letterSpacing: 8,
-    paddingVertical: spacing(1.5),
-    paddingHorizontal: spacing(1),
+  sentLabel: { fontFamily: fontsAlt.regular, fontSize: font.tiny, color: colors.muted },
+  sentPhone: { fontFamily: fonts.bold, fontSize: font.body, color: colors.heading, marginTop: 1 },
+  editLink: { fontFamily: fonts.bold, fontSize: font.small, color: colors.green, paddingHorizontal: spacing(0.5) },
+
+  // Six segmented code boxes + the hidden input that drives them.
+  otpRow: { flexDirection: "row", gap: spacing(1), position: "relative" },
+  otpBox: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    backgroundColor: colors.bg,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  otpBoxFilled: { borderColor: colors.green },
+  otpBoxActive: { borderColor: colors.green, backgroundColor: colors.greenTint },
+  otpDigit: { fontFamily: fonts.bold, fontSize: 22, color: colors.heading },
+  otpCaret: { width: 2, height: 22, borderRadius: 1, backgroundColor: colors.heading },
+  otpHiddenInput: { position: "absolute", width: "100%", height: "100%", opacity: 0 },
+
+  // Resend row.
+  resendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing(1.5),
+  },
+  resendLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  resendText: { fontFamily: fontsAlt.regular, fontSize: font.small, color: colors.muted },
+  resendLink: { fontFamily: fonts.bold, fontSize: font.small, color: colors.green },
+  resendLinkOff: { color: colors.line },
+
   helper: {
     fontFamily: fontsAlt.regular,
     fontSize: font.small,
@@ -454,4 +597,37 @@ const styles = StyleSheet.create({
   },
   trustTitle: { fontFamily: fonts.semibold, fontSize: font.small, color: colors.heading },
   trustSub: { fontFamily: fontsAlt.regular, fontSize: font.tiny, color: colors.muted, marginTop: 1 },
+
+  // OTP footer ---------------------------------------------------------------
+  ghostCta: { marginTop: spacing(0.5) },
+  otpSpacer: { flex: 1, minHeight: spacing(1.5) },
+  hairline: { height: 1, backgroundColor: colors.line, marginBottom: spacing(1.75) },
+  helpCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1.25),
+    backgroundColor: colors.greenTint,
+    borderRadius: 14,
+    paddingVertical: spacing(1.25),
+    paddingHorizontal: spacing(1.5),
+  },
+  helpIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  helpTitle: { fontFamily: fonts.bold, fontSize: font.small, color: colors.heading },
+  helpSub: { fontFamily: fontsAlt.regular, fontSize: font.tiny, color: colors.muted, marginTop: 1 },
+  terms: {
+    fontFamily: fontsAlt.regular,
+    fontSize: font.small,
+    color: colors.muted,
+    textAlign: "center",
+    lineHeight: 18,
+    marginTop: spacing(1.5),
+  },
+  termsLink: { fontFamily: fonts.semibold, color: colors.green },
 });
