@@ -6,8 +6,9 @@ import { useCartQuery, useUnreadCountQuery } from "../api/baseApi";
 import CartScreen from "../screens/CartScreen";
 import HomeScreen from "../screens/HomeScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
-import PlaceholderScreen from "../screens/PlaceholderScreen";
+import WishlistScreen from "../screens/WishlistScreen";
 import ProfileStack from "./ProfileStack";
+import { useAppSelector } from "../store/hooks";
 import { colors, fonts, palette } from "../theme";
 
 const Tab = createBottomTabNavigator();
@@ -23,13 +24,12 @@ const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
   Profile: ["person-outline", "person"],
 };
 
-const WishlistScreen = () => <PlaceholderScreen title="Wishlist" icon="heart-outline" />;
-
 export default function MainTabs() {
   const { data: cart } = useCartQuery();
   const { data: unread } = useUnreadCountQuery();
   const cartCount = cart?.item_count ?? 0;
   const unreadCount = unread?.unread_count ?? 0;
+  const wishlistCount = useAppSelector((s) => s.wishlist.items.length);
   // Respect the bottom safe area so the bar clears system nav / gesture bars.
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, 8);
@@ -76,7 +76,19 @@ export default function MainTabs() {
           },
         }}
       />
-      <Tab.Screen name="Wishlist" component={WishlistScreen} />
+      <Tab.Screen
+        name="Wishlist"
+        component={WishlistScreen}
+        options={{
+          tabBarBadge: wishlistCount > 0 ? wishlistCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.green,
+            color: colors.white,
+            fontFamily: fonts.bold,
+            fontSize: 10,
+          },
+        }}
+      />
       <Tab.Screen
         name="Cart"
         component={CartScreen}

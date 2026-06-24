@@ -23,6 +23,8 @@ import SplashScreen from "./src/screens/SplashScreen";
 import { store } from "./src/store";
 import { bootstrapped, setUser } from "./src/store/authSlice";
 import { loadTokens } from "./src/store/secureTokens";
+import { hydrateWishlist } from "./src/store/wishlistSlice";
+import { loadWishlist } from "./src/store/wishlistStorage";
 
 // Loads any saved tokens from secure storage before showing the app, so a
 // returning user lands straight in the main app instead of the login screen.
@@ -42,6 +44,7 @@ function Boot() {
     (async () => {
       const { access, refresh } = await loadTokens();
       store.dispatch(bootstrapped({ access, refresh }));
+      loadWishlist().then((items) => store.dispatch(hydrateWishlist(items)));
       setReady(true);
       // A returning user skips the login screen (which is what fetches the
       // profile), so load it here too — otherwise `user` stays null and the
