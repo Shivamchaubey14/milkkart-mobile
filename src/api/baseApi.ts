@@ -159,6 +159,7 @@ export type OrderAssignment = {
   rider_name: string;
   rider_phone: string;
   vehicle_number: string;
+  delivery_otp: string;
   rider_lat: string | null;
   rider_lng: string | null;
 };

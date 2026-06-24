@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { OrderItemDetail, useOrderDetailQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
@@ -15,16 +15,20 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const TINTS = ["#f6efdf", "#e2ecf9", "#e6f5ec", "#fde2e4", "#efe6f7", "#e2f3f5"];
 
+const RETURNED_AMBER = "#b46b00";
+
 const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
   pending: { label: "PENDING", bg: "#fff4d6", fg: "#b98421" },
   confirmed: { label: "CONFIRMED", bg: colors.greenTint, fg: colors.green },
   out_for_delivery: { label: "ON THE WAY", bg: "#fff4d6", fg: "#b98421" },
   delivered: { label: "DELIVERED", bg: "#e8f2fc", fg: colors.info },
   cancelled: { label: "CANCELLED", bg: colors.errorTint, fg: colors.error },
+  returned: { label: "RETURNED", bg: "#fdecd9", fg: RETURNED_AMBER },
 };
 const statusOf = (s: string) => STATUS[s] ?? { label: s.toUpperCase(), bg: colors.lineSoft, fg: colors.heading };
 
-const STEPS = ["Confirmed", "Packed", "On the\nway", "Delivered"];
+// The 4-step happy path; a returned order swaps the final step to "Returned".
+const BASE_STEPS = ["Confirmed", "Packed", "On the\nway", "Delivered"];
 const STEP_INDEX: Record<string, number> = { pending: 0, confirmed: 1, out_for_delivery: 2, delivered: 3 };
 
 function fmtDate(iso: string) {
@@ -49,7 +53,7 @@ export default function OrderDetailScreen() {
   const { orderNumber } = useRoute<RouteProp<ProfileStackParamList, "OrderDetail">>().params;
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const toast = useToast();
-  const { data: order, isLoading } = useOrderDetailQuery(orderNumber);
+  const { data: order, isLoading, isFetching, refetch } = useOrderDetailQuery(orderNumber);
   const [eta, setEta] = useState("");
 
   if (isLoading || !order) {
@@ -63,7 +67,11 @@ export default function OrderDetailScreen() {
   }
 
   const s = statusOf(order.status);
-  const step = STEP_INDEX[order.status] ?? 0;
+  const returned = order.status === "returned";
+  // Returned orders show "Returned" as the final step (only then); otherwise the
+  // normal 4-step path. The returned step sits at index 3 and is the active one.
+  const STEPS = returned ? ["Confirmed", "Packed", "On the\nway", "Returned"] : BASE_STEPS;
+  const step = returned ? 3 : STEP_INDEX[order.status] ?? 0;
   const tracking = order.status === "out_for_delivery";
   const rider = order.assignment;
 
@@ -88,7 +96,13 @@ export default function OrderDetailScreen() {
 
   return (
     <Screen padded={false}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.blob} />
@@ -126,7 +140,7 @@ export default function OrderDetailScreen() {
               <View style={styles.card}>
                 <View style={styles.timelineHead}>
                   <Text style={styles.arriving}>
-                    {order.status === "delivered" ? "Delivered" : "Arriving soon"}
+                    {returned ? "Returned" : order.status === "delivered" ? "Delivered" : "Arriving soon"}
                   </Text>
                   {tracking ? <Text style={styles.liveTrack}>Live track</Text> : null}
                 </View>
@@ -134,12 +148,22 @@ export default function OrderDetailScreen() {
                   {STEPS.map((label, i) => {
                     const done = i < step;
                     const active = i === step;
+                    const isReturnStep = returned && i === STEPS.length - 1;
                     return (
                       <View key={i} style={styles.timelineStep}>
                         <View style={styles.timelineLineWrap}>
                           {i > 0 ? <View style={[styles.line, i <= step && styles.lineDone]} /> : <View style={styles.line} />}
-                          <View style={[styles.node, (done || active) && styles.nodeDone, active && styles.nodeActive]}>
-                            {done ? (
+                          <View
+                            style={[
+                              styles.node,
+                              (done || active) && styles.nodeDone,
+                              active && styles.nodeActive,
+                              isReturnStep && active && styles.nodeReturned,
+                            ]}
+                          >
+                            {isReturnStep && active ? (
+                              <Ionicons name="arrow-undo" size={12} color={colors.white} />
+                            ) : done ? (
                               <Ionicons name="checkmark" size={13} color={colors.white} />
                             ) : (
                               <View style={[styles.nodeInner, active && styles.nodeInnerActive]} />
@@ -151,14 +175,37 @@ export default function OrderDetailScreen() {
                             <View style={styles.line} />
                           )}
                         </View>
-                        <Text style={[styles.stepLabel, (done || active) && styles.stepLabelDone]}>{label}</Text>
+                        <Text
+                          style={[
+                            styles.stepLabel,
+                            (done || active) && styles.stepLabelDone,
+                            isReturnStep && active && styles.stepLabelReturned,
+                          ]}
+                        >
+                          {label}
+                        </Text>
                       </View>
                     );
                   })}
                 </View>
               </View>
 
-              {/* Delivery partner */}
+              {/* Delivery OTP — share with the rider at the door (like the web).
+                  Shown whenever a rider is assigned and the order isn't finished. */}
+              {rider?.delivery_otp && !["delivered", "cancelled", "returned"].includes(order.status) ? (
+                <View style={styles.otpCard}>
+                  <View style={styles.otpIcon}>
+                    <Ionicons name="lock-closed" size={16} color={colors.green} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.otpLabel}>Delivery OTP</Text>
+                    <Text style={styles.otpHint}>Share with your delivery partner</Text>
+                  </View>
+                  <Text style={styles.otpCode}>{rider.delivery_otp}</Text>
+                </View>
+              ) : null}
+
+              {/* Delivery partner — name, vehicle & phone. */}
               {rider?.rider_name ? (
                 <View style={styles.card}>
                   <View style={styles.partnerRow}>
@@ -167,7 +214,10 @@ export default function OrderDetailScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.partnerName}>{rider.rider_name}</Text>
-                      <Text style={styles.partnerRole}>Delivery partner</Text>
+                      <Text style={styles.partnerRole}>
+                        Delivery partner{rider.vehicle_number ? ` · ${rider.vehicle_number}` : ""}
+                      </Text>
+                      {rider.rider_phone ? <Text style={styles.partnerPhone}>{rider.rider_phone}</Text> : null}
                     </View>
                     <Pressable
                       style={styles.callBtn}
@@ -352,8 +402,25 @@ const styles = StyleSheet.create({
   nodeActive: { backgroundColor: colors.green },
   nodeInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.muted },
   nodeInnerActive: { backgroundColor: colors.white },
+  nodeReturned: { backgroundColor: RETURNED_AMBER },
   stepLabel: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted, marginTop: 6, textAlign: "center" },
   stepLabelDone: { color: colors.heading, fontFamily: fonts.semibold },
+  stepLabelReturned: { color: RETURNED_AMBER, fontFamily: fonts.bold },
+
+  // Delivery OTP
+  otpCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1.25),
+    backgroundColor: colors.greenTint,
+    borderRadius: 16,
+    padding: spacing(1.75),
+    marginTop: spacing(1.5),
+  },
+  otpIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
+  otpLabel: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
+  otpHint: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.green, marginTop: 1 },
+  otpCode: { fontFamily: fonts.bold, fontSize: 22, color: colors.green, letterSpacing: 3 },
 
   // Partner
   partnerRow: { flexDirection: "row", alignItems: "center" },
@@ -361,6 +428,7 @@ const styles = StyleSheet.create({
   partnerInitial: { fontFamily: fonts.bold, fontSize: 18, color: colors.white },
   partnerName: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading, marginLeft: spacing(1.5) },
   partnerRole: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginLeft: spacing(1.5), marginTop: 1 },
+  partnerPhone: { fontFamily: fonts.semibold, fontSize: 13, color: colors.green, marginLeft: spacing(1.5), marginTop: 2 },
   callBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
 
   secLabel: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 1, color: colors.muted, marginTop: spacing(3), marginBottom: spacing(1) },
