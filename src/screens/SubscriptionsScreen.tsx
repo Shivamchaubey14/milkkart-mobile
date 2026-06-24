@@ -32,7 +32,7 @@ import {
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
-import { colors, fonts, fontsAlt, spacing } from "../theme";
+import { colors, fonts, fontsAlt, shadow, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const QUICK = [200, 500, 1000];
@@ -48,6 +48,17 @@ const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
   active: { label: "ACTIVE", bg: colors.greenTint, fg: colors.green },
   paused: { label: "PAUSED", bg: "#fff4d6", fg: "#b98421" },
   cancelled: { label: "CANCELLED", bg: colors.errorTint, fg: colors.error },
+};
+
+// Soft pastel tints so each product card reads distinctly (rotated by id).
+const THUMB_TINTS = ["#fdebcf", "#dbeafe", "#dcfce7", "#fde2e6", "#ede9fe", "#cffafe"];
+
+// Coloured action-button tones, drawn from the brand palette.
+const TONES: Record<string, { bg: string; fg: string }> = {
+  primary: { bg: colors.greenTint, fg: colors.green },
+  warn: { bg: colors.warningTint, fg: "#b98421" },
+  info: { bg: colors.infoTint, fg: colors.info },
+  danger: { bg: colors.errorTint, fg: colors.error },
 };
 
 function apiErr(e: any): string {
@@ -80,8 +91,23 @@ export default function SubscriptionsScreen() {
   const { data: summary } = useSubscriptionSummaryQuery();
   const { data: wallet } = useWalletQuery();
   const [amount, setAmount] = useState("");
+  const [tab, setTab] = useState<"subscribed" | "cancelled">("subscribed");
 
   const list = subs ?? [];
+  // Subscribed = active/paused. Cancelled = cancelled ones whose product isn't
+  // currently subscribed again, de-duped per product (newest kept; the list is
+  // ordered newest-first).
+  const subscribed = list.filter((s) => s.status !== "cancelled");
+  const activeVariants = new Set(subscribed.map((s) => s.variant_id));
+  const seenCancelled = new Set<number>();
+  const cancelled = list.filter((s) => {
+    if (s.status !== "cancelled" || activeVariants.has(s.variant_id) || seenCancelled.has(s.variant_id)) {
+      return false;
+    }
+    seenCancelled.add(s.variant_id);
+    return true;
+  });
+  const visible = tab === "subscribed" ? subscribed : cancelled;
 
   function addMoney() {
     // Top-up completes on the Wallet screen (full UPI / QR flow).
@@ -155,18 +181,44 @@ export default function SubscriptionsScreen() {
           {/* Subscriptions. */}
           <Text style={[styles.sectionLabel, { marginTop: spacing(3) }]}>Your subscriptions</Text>
 
+          {/* Subscribed / Cancelled tabs. */}
+          <View style={styles.tabs}>
+            <Pressable
+              style={[styles.tab, tab === "subscribed" && styles.tabActive]}
+              onPress={() => setTab("subscribed")}
+            >
+              <Text style={[styles.tabText, tab === "subscribed" && styles.tabTextActive]}>
+                Subscribed ({subscribed.length})
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.tab, tab === "cancelled" && styles.tabActive]}
+              onPress={() => setTab("cancelled")}
+            >
+              <Text style={[styles.tabText, tab === "cancelled" && styles.tabTextActive]}>
+                Cancelled ({cancelled.length})
+              </Text>
+            </Pressable>
+          </View>
+
           {isLoading ? (
             <ActivityIndicator color={colors.green} style={{ marginTop: spacing(3) }} />
-          ) : list.length === 0 ? (
+          ) : visible.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.emptyBadge}>
                 <Ionicons name="repeat-outline" size={30} color={colors.green} />
               </View>
-              <Text style={styles.emptyTitle}>No subscriptions yet</Text>
-              <Text style={styles.emptySub}>Subscribe to a product and it arrives fresh, on repeat.</Text>
+              <Text style={styles.emptyTitle}>
+                {tab === "subscribed" ? "No active subscriptions" : "No cancelled subscriptions"}
+              </Text>
+              <Text style={styles.emptySub}>
+                {tab === "subscribed"
+                  ? "Subscribe to a product and it arrives fresh, on repeat."
+                  : "Subscriptions you cancel will show up here."}
+              </Text>
             </View>
           ) : (
-            list.map((sub) => <SubCard key={sub.id} sub={sub} onResubscribe={browse} />)
+            visible.map((sub) => <SubCard key={sub.id} sub={sub} onResubscribe={browse} />)
           )}
 
           {/* Browse footer. */}
@@ -202,6 +254,7 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
   const [picker, setPicker] = useState<"from" | "to" | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const img = imageUrl(sub.image_url);
+  const tint = THUMB_TINTS[sub.id % THUMB_TINTS.length];
 
   const s = STATUS[sub.status] ?? STATUS.active;
   const cancelled = sub.status === "cancelled";
@@ -264,20 +317,28 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
   return (
     <View style={[styles.card, cancelled && styles.cardMuted]}>
       <View style={styles.cardTop}>
-        <View style={styles.thumb}>
+        <View style={[styles.thumb, { backgroundColor: cancelled ? colors.lineSoft : tint }]}>
           {img ? (
             <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="contain" />
           ) : (
-            <Ionicons name="cube-outline" size={20} color={colors.green} />
+            <Ionicons name="cube-outline" size={20} color={colors.heading} />
           )}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.cardTitle} numberOfLines={2}>
             {sub.product_name} - {sub.variant_label}
           </Text>
-          <Text style={styles.cardMeta}>
-            Qty {sub.quantity} · {FREQ_LABEL[sub.frequency] ?? sub.frequency} · {money(sub.daily_cost)}/delivery
-          </Text>
+          <View style={styles.metaChips}>
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>Qty {sub.quantity}</Text>
+            </View>
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>{FREQ_LABEL[sub.frequency] ?? sub.frequency}</Text>
+            </View>
+            <View style={styles.priceChip}>
+              <Text style={styles.priceChipText}>{money(sub.daily_cost)}/delivery</Text>
+            </View>
+          </View>
         </View>
         <View style={[styles.badge, { backgroundColor: s.bg }]}>
           <Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text>
@@ -306,10 +367,11 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
             <ActionBtn
               icon={paused ? "play" : "pause"}
               label={paused ? "Resume" : "Pause"}
+              tone={paused ? "primary" : "warn"}
               onPress={togglePause}
               loading={busy}
             />
-            <ActionBtn icon="calendar-outline" label="Calendar" onPress={() => toast("Delivery calendar — coming soon.")} />
+            <ActionBtn icon="calendar-outline" label="Calendar" tone="info" onPress={() => toast("Delivery calendar — coming soon.")} />
             <ActionBtn icon="close" label="Cancel" tone="danger" onPress={() => setConfirmOpen(true)} />
           </View>
 
@@ -408,28 +470,28 @@ function ActionBtn({
   icon,
   label,
   onPress,
-  tone,
+  tone = "primary",
   loading,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
   onPress: () => void;
-  tone?: "danger";
+  tone?: "primary" | "warn" | "info" | "danger";
   loading?: boolean;
 }) {
-  const danger = tone === "danger";
+  const t = TONES[tone];
   return (
     <Pressable
-      style={({ pressed }) => [styles.actionBtn, danger && styles.actionDanger, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.actionBtn, { backgroundColor: t.bg }, pressed && { opacity: 0.7 }]}
       onPress={onPress}
       disabled={loading}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={colors.green} />
+        <ActivityIndicator size="small" color={t.fg} />
       ) : (
         <>
-          <Ionicons name={icon} size={15} color={danger ? colors.error : colors.heading} />
-          <Text style={[styles.actionText, danger && { color: colors.error }]}>{label}</Text>
+          <Ionicons name={icon} size={15} color={t.fg} />
+          <Text style={[styles.actionText, { color: t.fg }]}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -523,16 +585,31 @@ const styles = StyleSheet.create({
   },
   addText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
 
+  // Subscribed / Cancelled tabs
+  tabs: {
+    flexDirection: "row",
+    gap: spacing(1),
+    backgroundColor: colors.bgSoft,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: spacing(1.75),
+  },
+  tab: { flex: 1, alignItems: "center", paddingVertical: spacing(1), borderRadius: 9 },
+  tabActive: { backgroundColor: colors.bg },
+  tabText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.muted },
+  tabTextActive: { color: colors.green },
+
   // Subscription card
   card: {
     backgroundColor: colors.bg,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.lineSoft,
     padding: spacing(2),
     marginBottom: spacing(1.5),
+    ...shadow.card,
   },
-  cardMuted: { backgroundColor: colors.bgSoft },
+  cardMuted: { backgroundColor: colors.bgSoft, shadowOpacity: 0, elevation: 0 },
   cardTop: { flexDirection: "row", alignItems: "flex-start", gap: spacing(1.25) },
   thumb: {
     width: 44,
@@ -545,7 +622,11 @@ const styles = StyleSheet.create({
   },
   thumbImg: { width: "100%", height: "100%" },
   cardTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
-  cardMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 3 },
+  metaChips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing(0.75) },
+  chip: { backgroundColor: colors.bgSoft, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
+  chipText: { fontFamily: fonts.semibold, fontSize: 11, color: colors.text },
+  priceChip: { backgroundColor: colors.greenTint, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
+  priceChipText: { fontFamily: fonts.bold, fontSize: 11, color: colors.green },
   badge: { borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
   badgeText: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 0.4 },
 
@@ -556,14 +637,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 5,
-    height: 40,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.bg,
+    height: 42,
+    borderRadius: 12,
   },
-  actionDanger: { borderColor: colors.errorTint, backgroundColor: colors.errorTint },
-  actionText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.heading },
+  actionText: { fontFamily: fonts.bold, fontSize: 13 },
 
   // On-vacation banner + scheduled list
   vacBanner: {

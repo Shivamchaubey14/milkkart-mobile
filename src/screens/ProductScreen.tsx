@@ -1,10 +1,12 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,15 +15,24 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  Address,
+  ProductDetail,
+  Subscription,
+  Variant,
   useAddToCartMutation,
+  useAddressesQuery,
   useCartQuery,
+  useCreateSubscriptionMutation,
   useProductDetailQuery,
   useProductRatingsQuery,
   useRemoveCartItemMutation,
   useSubmitProductRatingMutation,
+  useSubscriptionsQuery,
   useUpdateCartItemMutation,
+  useUpdateSubscriptionMutation,
 } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
@@ -29,6 +40,33 @@ import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { useAppSelector } from "../store/hooks";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
+
+// Delivery-time presets — the store runs mornings & evenings only. We map a chip
+// to a representative TimeField value.
+const TIME_SLOTS: { key: string; label: string; sub: string; value: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
+  { key: "morning", label: "Morning", sub: "6 – 11 AM", value: "07:00:00", icon: "sunny-outline" },
+  { key: "evening", label: "Evening", sub: "5 – 9 PM", value: "18:00:00", icon: "moon-outline" },
+];
+
+const FREQUENCIES: { key: string; label: string; sub: string }[] = [
+  { key: "daily", label: "Daily", sub: "Every day" },
+  { key: "alternate", label: "Alternate", sub: "Every other day" },
+  { key: "weekdays", label: "Mon–Fri", sub: "Weekdays only" },
+];
+
+const PAY_METHODS: { key: string; label: string; sub: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
+  { key: "wallet", label: "Wallet", sub: "Auto-debit each delivery", icon: "wallet-outline" },
+  { key: "cod", label: "Cash on delivery", sub: "Pay the rider", icon: "cash-outline" },
+];
+
+function isoDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function deriveTimeKey(t?: string | null) {
+  if (!t) return "morning";
+  return parseInt(t.slice(0, 2), 10) >= 14 ? "evening" : "morning";
+}
 
 const BADGE_PINK = "#ff6b81";
 
@@ -51,6 +89,7 @@ export default function ProductScreen() {
   const { slug } = useRoute<RouteProp<RootStackParamList, "Product">>().params;
   const toast = useToast();
   const { data: cart } = useCartQuery();
+  const { data: subscriptions } = useSubscriptionsQuery();
   const [addToCart] = useAddToCartMutation();
   const [updateCartItem] = useUpdateCartItemMutation();
   const [removeCartItem] = useRemoveCartItemMutation();
@@ -65,6 +104,7 @@ export default function ProductScreen() {
   const [wished, setWished] = useState(false);
   const [reviewStars, setReviewStars] = useState(0);
   const [reviewText, setReviewText] = useState("");
+  const [subOpen, setSubOpen] = useState(false);
 
   const variant =
     product?.variants.find((v) => v.id === variantId) ||
@@ -73,6 +113,12 @@ export default function ProductScreen() {
 
   // The cart line for the selected variant (shows the stepper when present).
   const cartItem = variant ? cart?.items.find((it) => it.variant === variant.id) : undefined;
+
+  // An existing (non-cancelled) subscription for this variant — drives the
+  // "Subscribed + Edit" state instead of "Subscribe & save".
+  const existingSub = variant
+    ? subscriptions?.find((sub) => sub.variant_id === variant.id && sub.status !== "cancelled")
+    : undefined;
 
   const distribution = useMemo(() => {
     const counts = [0, 0, 0, 0, 0]; // index 0 = 1 star … 4 = 5 stars
@@ -225,10 +271,28 @@ export default function ProductScreen() {
               <Text style={styles.addText}>Add to cart</Text>
             </Pressable>
           )}
-          <Pressable style={styles.subBtn} onPress={() => toast("Subscribe & save — coming soon.")}>
-            <Ionicons name="repeat-outline" size={18} color={colors.green} />
-            <Text style={styles.subText}>Subscribe & save</Text>
-          </Pressable>
+          {existingSub ? (
+            <View style={styles.subRow}>
+              <View style={styles.subscribedBtn}>
+                <Ionicons name="checkmark-circle" size={18} color={colors.green} />
+                <Text style={styles.subscribedText}>
+                  {existingSub.status === "paused" ? "Subscription paused" : "Subscribed"}
+                </Text>
+              </View>
+              <Pressable style={styles.editBtn} onPress={() => setSubOpen(true)}>
+                <Ionicons name="create-outline" size={17} color={colors.heading} />
+                <Text style={styles.editText}>Edit</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.subBtn}
+              onPress={() => (variant ? setSubOpen(true) : toast("Pick a pack first.", "info"))}
+            >
+              <Ionicons name="repeat-outline" size={18} color={colors.green} />
+              <Text style={styles.subText}>Subscribe & save</Text>
+            </Pressable>
+          )}
 
           {/* Ratings & reviews */}
           <Text style={styles.reviewsHead}>Ratings & Reviews</Text>
@@ -304,7 +368,263 @@ export default function ProductScreen() {
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
+
+      {variant ? (
+        <SubscribeSheet
+          visible={subOpen}
+          onClose={() => setSubOpen(false)}
+          product={product}
+          variant={variant}
+          editing={existingSub}
+        />
+      ) : null}
     </Screen>
+  );
+}
+
+function SubscribeSheet({
+  visible,
+  onClose,
+  product,
+  variant,
+  editing,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  product: ProductDetail;
+  variant: Variant;
+  editing?: Subscription;
+}) {
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
+  const { data: addresses } = useAddressesQuery();
+  const [createSubscription, { isLoading: creating }] = useCreateSubscriptionMutation();
+  const [updateSubscription, { isLoading: updating }] = useUpdateSubscriptionMutation();
+  const saving = creating || updating;
+
+  const [qty, setQty] = useState(1);
+  const [freq, setFreq] = useState("daily");
+  const [timeKey, setTimeKey] = useState("morning");
+  const [payMethod, setPayMethod] = useState("wallet");
+  const [addressId, setAddressId] = useState<number | null>(null);
+
+  const translateY = useRef(new Animated.Value(900)).current;
+  const backdrop = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(visible);
+
+  // When opening, prefill from the existing subscription (edit) or reset (create).
+  useEffect(() => {
+    if (!visible) return;
+    setQty(editing?.quantity ?? 1);
+    setFreq(editing?.frequency ?? "daily");
+    setTimeKey(deriveTimeKey(editing?.preferred_time));
+    setPayMethod(editing?.payment_method ?? "wallet");
+    setAddressId(editing?.address_id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  // Default the address to the user's default (or first) once they load (create only).
+  useEffect(() => {
+    if (addressId == null && addresses?.length) {
+      setAddressId((addresses.find((a) => a.is_default) ?? addresses[0]).id);
+    }
+  }, [addresses, addressId]);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(backdrop, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 170 }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(backdrop, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 900, duration: 220, useNativeDriver: true }),
+      ]).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const img = imageUrl(product.image_url);
+  const unit = Number(variant.price);
+  const perDelivery = unit * qty;
+
+  async function onSave() {
+    if (!addressId) {
+      toast("Add a delivery address in your Profile first.", "info");
+      return;
+    }
+    const slot = TIME_SLOTS.find((t) => t.key === timeKey);
+    try {
+      if (editing) {
+        await updateSubscription({
+          id: editing.id,
+          quantity: qty,
+          frequency: freq,
+          address_id: addressId,
+          preferred_time: slot?.value ?? null,
+          payment_method: payMethod,
+        }).unwrap();
+        toast("Subscription updated.");
+      } else {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        await createSubscription({
+          variant_id: variant.id,
+          quantity: qty,
+          frequency: freq,
+          address_id: addressId,
+          preferred_time: slot?.value ?? null,
+          payment_method: payMethod,
+          start_date: isoDate(tomorrow),
+        }).unwrap();
+        toast("Subscribed! Your first delivery arrives tomorrow.");
+      }
+      onClose();
+    } catch (e: any) {
+      toast(e?.data?.error || e?.data?.detail || "Couldn't save. Try again.", "error");
+    }
+  }
+
+  if (!mounted) return null;
+
+  return (
+    <Modal transparent visible={mounted} animationType="none" statusBarTranslucent onRequestClose={onClose}>
+      <Animated.View style={[ss.backdrop, { opacity: backdrop }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+      <Animated.View style={[ss.sheet, { transform: [{ translateY }], paddingBottom: insets.bottom + spacing(2) }]}>
+        <View style={ss.handle} />
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+          {/* Product header */}
+          <View style={ss.head}>
+            <View style={ss.thumb}>
+              {img ? <Image source={{ uri: img }} style={ss.thumbImg} resizeMode="contain" /> : null}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={ss.title} numberOfLines={2}>
+                {product.name}
+              </Text>
+              <Text style={ss.sub}>
+                {variant.label} · ₹{unit.toFixed(2)}
+              </Text>
+              <View style={ss.savePill}>
+                <Ionicons name="pricetag" size={11} color={colors.green} />
+                <Text style={ss.savePillText}>
+                  {editing ? "Editing your subscription" : "Save with a subscription"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Quantity */}
+          <Text style={ss.label}>Quantity per delivery</Text>
+          <View style={ss.qtyRow}>
+            <Pressable style={ss.qtyBtn} onPress={() => setQty((q) => Math.max(1, q - 1))}>
+              <Ionicons name="remove" size={20} color={colors.heading} />
+            </Pressable>
+            <Text style={ss.qtyValue}>{qty}</Text>
+            <Pressable style={ss.qtyBtn} onPress={() => setQty((q) => Math.min(20, q + 1))}>
+              <Ionicons name="add" size={20} color={colors.heading} />
+            </Pressable>
+          </View>
+
+          {/* Frequency */}
+          <Text style={ss.label}>How often?</Text>
+          <View style={ss.optionRow}>
+            {FREQUENCIES.map((f) => {
+              const active = freq === f.key;
+              return (
+                <Pressable key={f.key} style={[ss.option, active && ss.optionActive]} onPress={() => setFreq(f.key)}>
+                  <Text style={[ss.optionLabel, active && ss.optionLabelActive]}>{f.label}</Text>
+                  <Text style={[ss.optionSub, active && ss.optionSubActive]}>{f.sub}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Preferred time */}
+          <Text style={ss.label}>Preferred time</Text>
+          <View style={ss.optionRow}>
+            {TIME_SLOTS.map((t) => {
+              const active = timeKey === t.key;
+              return (
+                <Pressable key={t.key} style={[ss.option, active && ss.optionActive]} onPress={() => setTimeKey(t.key)}>
+                  <Ionicons name={t.icon} size={18} color={active ? colors.green : colors.muted} />
+                  <Text style={[ss.optionLabel, active && ss.optionLabelActive, { marginTop: 4 }]}>{t.label}</Text>
+                  <Text style={[ss.optionSub, active && ss.optionSubActive]}>{t.sub}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Address */}
+          <Text style={ss.label}>Deliver to</Text>
+          {addresses?.length ? (
+            addresses.map((a: Address) => {
+              const active = addressId === a.id;
+              return (
+                <Pressable key={a.id} style={[ss.addr, active && ss.addrActive]} onPress={() => setAddressId(a.id)}>
+                  <Ionicons
+                    name={active ? "radio-button-on" : "radio-button-off"}
+                    size={18}
+                    color={active ? colors.green : colors.muted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={ss.addrLabel}>{a.label || "Address"}</Text>
+                    <Text style={ss.addrText} numberOfLines={1}>
+                      {a.address_line}, {a.city}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })
+          ) : (
+            <Text style={ss.noAddr}>No saved address. Add one in Profile › Addresses, then subscribe.</Text>
+          )}
+
+          {/* Payment method — how each delivery is paid. */}
+          <Text style={ss.label}>Pay with</Text>
+          {PAY_METHODS.map((p) => {
+            const active = payMethod === p.key;
+            return (
+              <Pressable key={p.key} style={[ss.addr, active && ss.addrActive]} onPress={() => setPayMethod(p.key)}>
+                <Ionicons name={p.icon} size={20} color={active ? colors.green : colors.muted} />
+                <View style={{ flex: 1 }}>
+                  <Text style={ss.addrLabel}>{p.label}</Text>
+                  <Text style={ss.addrText}>{p.sub}</Text>
+                </View>
+                <Ionicons
+                  name={active ? "radio-button-on" : "radio-button-off"}
+                  size={18}
+                  color={active ? colors.green : colors.muted}
+                />
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* Footer CTA */}
+        <View style={ss.footer}>
+          <View>
+            <Text style={ss.footerLabel}>Per delivery</Text>
+            <Text style={ss.footerPrice}>₹{perDelivery.toFixed(2)}</Text>
+          </View>
+          <Pressable
+            style={[ss.cta, (saving || !addresses?.length) && ss.ctaOff]}
+            onPress={onSave}
+            disabled={saving || !addresses?.length}
+          >
+            {saving ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={ss.ctaText}>{editing ? "Save changes" : "Start subscription"}</Text>
+            )}
+          </Pressable>
+        </View>
+      </Animated.View>
+    </Modal>
   );
 }
 
@@ -414,6 +734,32 @@ const styles = StyleSheet.create({
   },
   subText: { fontFamily: fonts.bold, fontSize: 15, color: colors.green },
 
+  // Already-subscribed + Edit row
+  subRow: { flexDirection: "row", gap: spacing(1.25), marginTop: spacing(1.25) },
+  subscribedBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.greenTint,
+    borderRadius: 14,
+    paddingVertical: spacing(1.5),
+  },
+  subscribedText: { fontFamily: fonts.bold, fontSize: 15, color: colors.green },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    borderRadius: 14,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(2.5),
+  },
+  editText: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+
   // Reviews
   reviewsHead: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading, marginTop: spacing(3.5) },
   ratingSummary: { flexDirection: "row", gap: spacing(2.5), marginTop: spacing(1.5), alignItems: "center" },
@@ -472,4 +818,117 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
+});
+
+// Subscribe & save bottom sheet
+const ss = StyleSheet.create({
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(37,61,78,0.5)" },
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxHeight: "88%",
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingHorizontal: spacing(2.5),
+    paddingTop: spacing(1.25),
+  },
+  handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(2) },
+
+  head: { flexDirection: "row", gap: spacing(1.5), marginBottom: spacing(1) },
+  thumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    backgroundColor: "#f6efdf",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  thumbImg: { width: "100%", height: "100%" },
+  title: { fontFamily: fonts.bold, fontSize: 17, color: colors.heading },
+  sub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, marginTop: 2 },
+  savePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    backgroundColor: colors.greenTint,
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    marginTop: spacing(0.75),
+  },
+  savePillText: { fontFamily: fonts.bold, fontSize: 11, color: colors.green },
+
+  label: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading, marginTop: spacing(2.25), marginBottom: spacing(1.25) },
+
+  qtyRow: { flexDirection: "row", alignItems: "center", gap: spacing(2.5), alignSelf: "flex-start" },
+  qtyBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qtyValue: { fontFamily: fonts.bold, fontSize: 20, color: colors.heading, minWidth: 28, textAlign: "center" },
+
+  optionRow: { flexDirection: "row", gap: spacing(1) },
+  option: {
+    flex: 1,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    borderRadius: 14,
+    paddingVertical: spacing(1.25),
+    paddingHorizontal: spacing(0.5),
+  },
+  optionActive: { borderColor: colors.green, backgroundColor: colors.greenTint },
+  optionLabel: { fontFamily: fonts.bold, fontSize: 13.5, color: colors.heading },
+  optionLabelActive: { color: colors.green },
+  optionSub: { fontFamily: fontsAlt.regular, fontSize: 10.5, color: colors.muted, marginTop: 2, textAlign: "center" },
+  optionSubActive: { color: colors.green },
+
+  addr: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1.25),
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    borderRadius: 14,
+    paddingVertical: spacing(1.25),
+    paddingHorizontal: spacing(1.5),
+    marginBottom: spacing(1),
+  },
+  addrActive: { borderColor: colors.green, backgroundColor: colors.greenTint },
+  addrLabel: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
+  addrText: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 1 },
+  noAddr: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, lineHeight: 19 },
+
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft,
+    paddingTop: spacing(1.5),
+    marginTop: spacing(1),
+  },
+  footerLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted },
+  footerPrice: { fontFamily: fonts.bold, fontSize: 22, color: colors.heading },
+  cta: {
+    backgroundColor: colors.green,
+    borderRadius: 14,
+    paddingVertical: spacing(1.75),
+    paddingHorizontal: spacing(3.5),
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 170,
+  },
+  ctaOff: { opacity: 0.55 },
+  ctaText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
 });
