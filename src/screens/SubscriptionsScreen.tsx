@@ -23,6 +23,7 @@ import {
   useAddVacationMutation,
   useCancelSubscriptionMutation,
   usePauseSubscriptionMutation,
+  useRemoveVacationMutation,
   useResumeSubscriptionMutation,
   useSubscriptionSummaryQuery,
   useSubscriptionsQuery,
@@ -59,6 +60,17 @@ function isoDate(d: Date) {
 
 function fmtDay(d: Date) {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+// Parse an ISO "YYYY-MM-DD" as a local date (avoids UTC off-by-one).
+function parseISO(s: string) {
+  return new Date(s + "T00:00:00");
+}
+
+function todayLocal() {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  return t;
 }
 
 export default function SubscriptionsScreen() {
@@ -183,6 +195,7 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
   const [resume, { isLoading: resuming }] = useResumeSubscriptionMutation();
   const [cancel] = useCancelSubscriptionMutation();
   const [addVacation, { isLoading: addingVac }] = useAddVacationMutation();
+  const [removeVacation] = useRemoveVacationMutation();
 
   const [from, setFrom] = useState<Date | null>(null);
   const [to, setTo] = useState<Date | null>(null);
@@ -194,6 +207,21 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
   const cancelled = sub.status === "cancelled";
   const paused = sub.status === "paused";
   const busy = pausing || resuming;
+
+  // Vacations: which one is active today (deliveries paused), and is the sub on
+  // vacation right now — so the user is clearly told.
+  const today = todayLocal();
+  const activeVac = sub.vacations.find((v) => parseISO(v.start_date) <= today && today <= parseISO(v.end_date));
+  const onVacation = !cancelled && !!activeVac;
+
+  async function removeVac(vacationId: number) {
+    try {
+      await removeVacation({ id: sub.id, vacationId }).unwrap();
+      toast("Vacation removed.");
+    } catch (e) {
+      toast(apiErr(e), "error");
+    }
+  }
 
   async function togglePause() {
     try {
@@ -256,6 +284,15 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
         </View>
       </View>
 
+      {onVacation ? (
+        <View style={styles.vacBanner}>
+          <Ionicons name="airplane" size={14} color={colors.green} />
+          <Text style={styles.vacBannerText}>
+            On vacation until {fmtDay(parseISO(activeVac!.end_date))} — deliveries paused.
+          </Text>
+        </View>
+      ) : null}
+
       {cancelled ? (
         <View style={styles.cancelledRow}>
           <Text style={styles.cancelledText}>This subscription is cancelled.</Text>
@@ -309,6 +346,30 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
                 }
               }}
             />
+          ) : null}
+
+          {sub.vacations.length > 0 ? (
+            <View style={styles.vacList}>
+              {sub.vacations.map((v) => {
+                const vActive = parseISO(v.start_date) <= today && today <= parseISO(v.end_date);
+                return (
+                  <View key={v.id} style={styles.vacItem}>
+                    <Ionicons
+                      name="airplane-outline"
+                      size={13}
+                      color={vActive ? colors.green : colors.muted}
+                    />
+                    <Text style={styles.vacItemText}>
+                      {fmtDay(parseISO(v.start_date))} – {fmtDay(parseISO(v.end_date))}
+                    </Text>
+                    {vActive ? <Text style={styles.vacItemActive}>Active</Text> : null}
+                    <Pressable onPress={() => removeVac(v.id)} hitSlop={8}>
+                      <Ionicons name="close" size={14} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
           ) : null}
         </>
       )}
@@ -503,6 +564,40 @@ const styles = StyleSheet.create({
   },
   actionDanger: { borderColor: colors.errorTint, backgroundColor: colors.errorTint },
   actionText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.heading },
+
+  // On-vacation banner + scheduled list
+  vacBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: colors.greenTint,
+    borderRadius: 12,
+    paddingVertical: spacing(1),
+    paddingHorizontal: spacing(1.5),
+    marginTop: spacing(1.5),
+  },
+  vacBannerText: { flex: 1, fontFamily: fonts.semibold, fontSize: 12.5, color: colors.green },
+  vacList: { marginTop: spacing(1.5), gap: spacing(0.75) },
+  vacItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.bgSoft,
+    borderRadius: 10,
+    paddingVertical: spacing(0.75),
+    paddingHorizontal: spacing(1.25),
+  },
+  vacItemText: { flex: 1, fontFamily: fontsAlt.semibold, fontSize: 13, color: colors.heading },
+  vacItemActive: {
+    fontFamily: fonts.bold,
+    fontSize: 10,
+    color: colors.green,
+    backgroundColor: colors.greenTint,
+    borderRadius: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    overflow: "hidden",
+  },
 
   vacLabel: { fontFamily: fonts.semibold, fontSize: 12, color: colors.muted, marginTop: spacing(1.75), marginBottom: spacing(1) },
   vacRow: { flexDirection: "row", gap: spacing(1), alignItems: "center" },
