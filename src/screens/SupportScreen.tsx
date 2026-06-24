@@ -6,6 +6,7 @@ import {
   Linking,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -56,9 +57,14 @@ function fmtDate(iso: string) {
 
 export default function SupportScreen() {
   const toast = useToast();
-  const { data: faqs } = useFaqsQuery();
-  const { data: tickets } = useSupportTicketsQuery();
-  const { data: orders } = useOrdersQuery();
+  const { data: faqs, refetch: refetchFaqs } = useFaqsQuery();
+  const { data: tickets, isFetching, refetch: refetchTickets } = useSupportTicketsQuery();
+  const { data: orders, refetch: refetchOrders } = useOrdersQuery();
+  const onRefresh = () => {
+    refetchTickets();
+    refetchFaqs();
+    refetchOrders();
+  };
   const [createTicket, { isLoading: submitting }] = useCreateSupportTicketMutation();
 
   const [reason, setReason] = useState("wrong_item");
@@ -107,7 +113,14 @@ export default function SupportScreen() {
   return (
     <Screen padded={false}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scroll}
+          refreshControl={
+            <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
+          }
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.blob} />

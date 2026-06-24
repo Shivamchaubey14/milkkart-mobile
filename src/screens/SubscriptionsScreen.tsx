@@ -7,6 +7,7 @@ import {
   Image,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -87,9 +88,14 @@ function todayLocal() {
 export default function SubscriptionsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const toast = useToast();
-  const { data: subs, isLoading } = useSubscriptionsQuery();
-  const { data: summary } = useSubscriptionSummaryQuery();
-  const { data: wallet } = useWalletQuery();
+  const { data: subs, isLoading, isFetching, refetch: refetchSubs } = useSubscriptionsQuery();
+  const { data: summary, refetch: refetchSummary } = useSubscriptionSummaryQuery();
+  const { data: wallet, refetch: refetchWallet } = useWalletQuery();
+  const onRefresh = () => {
+    refetchSubs();
+    refetchSummary();
+    refetchWallet();
+  };
   const [amount, setAmount] = useState("");
   const [tab, setTab] = useState<"subscribed" | "cancelled">("subscribed");
 
@@ -121,7 +127,13 @@ export default function SubscriptionsScreen() {
 
   return (
     <Screen padded={false}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
+        }
+      >
         {/* Dark header — title, catchy strapline, monthly stats. */}
         <View style={styles.header}>
           <View style={styles.blob} />

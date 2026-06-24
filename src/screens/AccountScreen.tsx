@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -76,7 +77,7 @@ export default function AccountScreen() {
   const user = useAppSelector((s) => s.auth.user);
   const dispatch = useAppDispatch();
   const toast = useToast();
-  const { data: addresses, isLoading } = useAddressesQuery();
+  const { data: addresses, isLoading, isFetching, refetch } = useAddressesQuery();
   const [updateMe, { isLoading: saving }] = useUpdateMeMutation();
   const [deleteAddress] = useDeleteAddressMutation();
 
@@ -123,7 +124,13 @@ export default function AccountScreen() {
 
   return (
     <Screen padded={false}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+        }
+      >
         {/* Header — matches the Profile screen's dark card. */}
         <View style={styles.header}>
           <View style={styles.blob} />

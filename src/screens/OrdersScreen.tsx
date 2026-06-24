@@ -7,6 +7,7 @@ import {
   Animated,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -55,7 +56,7 @@ function fmtDate(iso: string) {
 
 export default function OrdersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { data: orders, isLoading } = useOrdersQuery();
+  const { data: orders, isLoading, isFetching, refetch } = useOrdersQuery();
   const [filter, setFilter] = useState("all");
 
   const sorted = [...(orders ?? [])].sort(
@@ -109,7 +110,13 @@ export default function OrdersScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+            }
+          >
             {visible.map((o, i) => (
               <OrderCard
                 key={o.id}

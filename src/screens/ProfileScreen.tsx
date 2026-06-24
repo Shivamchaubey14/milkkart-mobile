@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { useWalletQuery } from "../api/baseApi";
 import { Screen } from "../components/Screen";
@@ -74,7 +74,7 @@ export default function ProfileScreen() {
   const dispatch = useAppDispatch();
   const toast = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { data: wallet } = useWalletQuery();
+  const { data: wallet, isFetching, refetch } = useWalletQuery();
 
   const initial = (user?.name?.trim()?.[0] || "U").toUpperCase();
 
@@ -86,7 +86,13 @@ export default function ProfileScreen() {
 
   return (
     <Screen padded={false}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+        }
+      >
         {/* Dark header — title + user identity. */}
         <View style={styles.header}>
           <View style={styles.blob} />
