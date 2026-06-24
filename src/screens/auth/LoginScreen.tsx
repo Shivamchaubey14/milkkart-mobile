@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -138,7 +139,13 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
       >
-        <View style={[styles.screen, { paddingBottom: insets.bottom + spacing(1) }]}>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={[styles.screen, { paddingBottom: insets.bottom + spacing(1) }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           {/* Green rounded card — logo chip, rating badge, welcome heading,
               strapline, and the feature pills. */}
           <View style={styles.heroCard}>
@@ -341,7 +348,7 @@ export default function LoginScreen() {
               </>
             )}
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -349,9 +356,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  // Single-screen layout — fills the available height, no scrolling. The hero
-  // sits at top; the body below flexes to fill and pins the terms to the bottom.
-  screen: { flex: 1, paddingTop: spacing(1) },
+  // Fills the screen when the keyboard is closed (flexGrow), and scrolls the
+  // field + button into view when the keyboard opens (it's a ScrollView).
+  screen: { flexGrow: 1, paddingTop: spacing(1) },
 
   // Green card — rounded on all corners, floating on the white screen.
   heroCard: {
@@ -453,7 +460,7 @@ const styles = StyleSheet.create({
   },
 
   // Form ---------------------------------------------------------------------
-  body: { flex: 1, paddingHorizontal: spacing(0.5), paddingTop: spacing(2) },
+  body: { paddingHorizontal: spacing(0.5), paddingTop: spacing(2) },
   bodyTitle: { fontFamily: fonts.bold, fontSize: font.h2, color: colors.heading },
   bodyTitleAlt: { color: colors.green },
   bodyLead: {
