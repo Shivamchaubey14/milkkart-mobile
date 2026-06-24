@@ -37,13 +37,15 @@ const QUICK = [100, 200, 500];
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_TRIES = 40;
 
-type UpiApp = { key: string; name: string; pkg?: string };
-// `pkg` is the Android package we target the UPI intent at; "Other" omits it so
-// the system shows its UPI app chooser.
+type UpiApp = { key: string; name: string; pkg?: string; ios?: string };
+// `pkg` is the Android package we target the UPI intent at. `ios` is the app's
+// own iOS URL scheme — iOS has no generic UPI intent, so `upi://` is grabbed by
+// whatever registered it (e.g. WhatsApp); we must open each app by its scheme.
+// "Other" omits both so the OS falls back to the generic upi:// handler.
 const UPI_APPS: UpiApp[] = [
-  { key: "gpay", name: "Google Pay", pkg: "com.google.android.apps.nbu.paisa.user" },
-  { key: "phonepe", name: "PhonePe", pkg: "com.phonepe.app" },
-  { key: "paytm", name: "Paytm", pkg: "net.one97.paytm" },
+  { key: "gpay", name: "Google Pay", pkg: "com.google.android.apps.nbu.paisa.user", ios: "tez://upi/pay" },
+  { key: "phonepe", name: "PhonePe", pkg: "com.phonepe.app", ios: "phonepe://pay" },
+  { key: "paytm", name: "Paytm", pkg: "net.one97.paytm", ios: "paytmmp://pay" },
   { key: "other", name: "Other UPI App" },
 ];
 
@@ -162,11 +164,19 @@ export default function WalletScreen() {
           return;
         }
       } else {
+        // iOS: open the chosen app by its own scheme (upi:// would be hijacked by
+        // WhatsApp/BHIM). Reuse the same query params; fall back to generic upi://.
+        const query = intent.includes("?") ? intent.slice(intent.indexOf("?")) : "";
+        const appUrl = app.ios ? app.ios + query : intent;
         try {
-          await Linking.openURL(intent);
+          await Linking.openURL(appUrl);
         } catch {
-          toast("No UPI app found to handle the payment.", "error");
-          return;
+          try {
+            await Linking.openURL(intent);
+          } catch {
+            toast(`Couldn't open ${app.name}. Is it installed?`, "error");
+            return;
+          }
         }
       }
 
