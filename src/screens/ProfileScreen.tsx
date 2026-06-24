@@ -115,6 +115,7 @@ export default function ProfileScreen() {
                 if (m.key === "profile") navigation.navigate("Account");
                 else if (m.key === "wallet") navigation.navigate("Wallet");
                 else if (m.key === "orders") navigation.navigate("Orders");
+                else if (m.key === "subscriptions") navigation.navigate("Subscriptions");
                 else toast(`${m.title} — coming soon.`);
               }}
             >
