@@ -199,6 +199,49 @@ export type Wallet = {
   recent_transactions: WalletTransaction[];
 };
 
+export type WalletTopupCreated = {
+  topup_id: number;
+  amount: string;
+  status: string;
+  // Gateway-agnostic UPI intent/QR built by the backend (single source of truth).
+  upi: { intent: string; vpa: string; payee_name: string };
+  gateway: { provider: string; key_id: string; order_id: string; amount: number; currency: string };
+};
+
+export type WalletTopupStatus = {
+  topup_id: number;
+  status: "created" | "success" | "failed";
+  wallet: Wallet;
+};
+
+export type SubscriptionVacation = { id: number; start_date: string; end_date: string };
+
+export type Subscription = {
+  id: number;
+  variant_id: number;
+  product_name: string;
+  variant_label: string;
+  quantity: number;
+  frequency: "daily" | "alternate" | "weekdays" | "custom";
+  custom_days: string[];
+  address_id: number;
+  preferred_time: string | null;
+  status: "active" | "paused" | "cancelled";
+  start_date: string;
+  daily_cost: string;
+  vacations: SubscriptionVacation[];
+  created_at: string;
+};
+
+export type SubscriptionSummary = {
+  year: number;
+  month: number;
+  deliveries: number;
+  skipped: number;
+  failed_balance: number;
+  amount_spent: string;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -245,7 +288,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -432,8 +475,13 @@ export const api = createApi({
       query: () => "/wallet/",
       providesTags: ["Wallet"],
     }),
-    walletTopup: build.mutation<{ topup_id: number; gateway: { order_id: string } }, number>({
+    walletTopup: build.mutation<WalletTopupCreated, number>({
       query: (amount) => ({ url: "/wallet/topup/", method: "POST", body: { amount } }),
+    }),
+    // Poll the top-up's status — the source of truth across web/iOS/Android. A
+    // real gateway confirms via webhook; the response carries the fresh wallet.
+    walletTopupStatus: build.query<WalletTopupStatus, number>({
+      query: (topupId) => `/wallet/topup/${topupId}/status/`,
     }),
     walletMockPay: build.mutation<unknown, string>({
       query: (gateway_order_id) => ({
@@ -442,6 +490,35 @@ export const api = createApi({
         body: { gateway_order_id },
       }),
       invalidatesTags: ["Wallet"],
+    }),
+    subscriptions: build.query<Subscription[], void>({
+      query: () => "/subscriptions/",
+      transformResponse: (r: Subscription[] | Paginated<Subscription>) =>
+        Array.isArray(r) ? r : r.results,
+      providesTags: ["Subscription"],
+    }),
+    subscriptionSummary: build.query<SubscriptionSummary, void>({
+      query: () => "/subscriptions/summary/",
+      providesTags: ["Subscription"],
+    }),
+    pauseSubscription: build.mutation<Subscription, number>({
+      query: (id) => ({ url: `/subscriptions/${id}/pause/`, method: "POST" }),
+      invalidatesTags: ["Subscription"],
+    }),
+    resumeSubscription: build.mutation<Subscription, number>({
+      query: (id) => ({ url: `/subscriptions/${id}/resume/`, method: "POST" }),
+      invalidatesTags: ["Subscription"],
+    }),
+    cancelSubscription: build.mutation<void, number>({
+      query: (id) => ({ url: `/subscriptions/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["Subscription"],
+    }),
+    addVacation: build.mutation<
+      SubscriptionVacation,
+      { id: number; start_date: string; end_date: string }
+    >({
+      query: ({ id, ...body }) => ({ url: `/subscriptions/${id}/vacation/`, method: "POST", body }),
+      invalidatesTags: ["Subscription"],
     }),
   }),
 });
@@ -476,5 +553,12 @@ export const {
   useInitiatePaymentMutation,
   useWalletQuery,
   useWalletTopupMutation,
+  useLazyWalletTopupStatusQuery,
   useWalletMockPayMutation,
+  useSubscriptionsQuery,
+  useSubscriptionSummaryQuery,
+  usePauseSubscriptionMutation,
+  useResumeSubscriptionMutation,
+  useCancelSubscriptionMutation,
+  useAddVacationMutation,
 } = api;
