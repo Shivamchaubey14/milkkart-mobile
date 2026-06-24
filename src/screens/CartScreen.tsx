@@ -8,6 +8,7 @@ import {
   Dimensions,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -38,7 +39,7 @@ const SCREEN_W = Dimensions.get("window").width;
 export default function CartScreen() {
   const toast = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { data: cart, isLoading } = useCartQuery();
+  const { data: cart, isLoading, isFetching, refetch } = useCartQuery();
   const [addToCart] = useAddToCartMutation();
   const [updateCartItem] = useUpdateCartItemMutation();
   const [removeCartItem] = useRemoveCartItemMutation();
@@ -129,6 +130,9 @@ export default function CartScreen() {
               ref={scrollRef}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
+              refreshControl={
+                <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+              }
             >
               {header}
               <View style={styles.list}>

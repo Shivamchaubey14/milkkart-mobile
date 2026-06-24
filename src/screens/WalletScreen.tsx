@@ -8,6 +8,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -85,7 +86,7 @@ function fmtDate(iso: string) {
 
 export default function WalletScreen() {
   const toast = useToast();
-  const { data: wallet, isLoading, refetch } = useWalletQuery();
+  const { data: wallet, isLoading, isFetching, refetch } = useWalletQuery();
   const [topup] = useWalletTopupMutation();
   const [fetchStatus] = useLazyWalletTopupStatusQuery();
   const [amount, setAmount] = useState("");
@@ -264,7 +265,14 @@ export default function WalletScreen() {
         </View>
 
         {/* Only the transaction list scrolls. */}
-        <ScrollView style={styles.flex} showsVerticalScrollIndicator={false} contentContainerStyle={styles.txnList}>
+        <ScrollView
+          style={styles.flex}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.txnList}
+          refreshControl={
+            <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          }
+        >
           {isLoading ? (
             <ActivityIndicator color={colors.green} style={{ marginTop: spacing(2) }} />
           ) : txns.length > 0 ? (

@@ -7,6 +7,7 @@ import {
   Dimensions,
   Linking,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -49,7 +50,9 @@ export default function TrackOrderScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const insets = useSafeAreaInsets();
   // Poll so the rider's position and status refresh while we watch.
-  const { data: order, isLoading } = useOrderDetailQuery(orderNumber, { pollingInterval: 10000 });
+  const { data: order, isLoading, isFetching, refetch } = useOrderDetailQuery(orderNumber, {
+    pollingInterval: 10000,
+  });
   const [eta, setEta] = useState("");
 
   if (isLoading || !order) {
@@ -142,6 +145,9 @@ export default function TrackOrderScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: spacing(2.5), paddingBottom: insets.bottom + spacing(3) }}
+          refreshControl={
+            <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          }
         >
           <View style={styles.grabber} />
 
