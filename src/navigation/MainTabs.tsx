@@ -2,9 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useCartQuery } from "../api/baseApi";
+import { useCartQuery, useUnreadCountQuery } from "../api/baseApi";
 import CartScreen from "../screens/CartScreen";
 import HomeScreen from "../screens/HomeScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
 import ProfileStack from "./ProfileStack";
 import { colors, fonts, palette } from "../theme";
@@ -22,12 +23,13 @@ const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
   Profile: ["person-outline", "person"],
 };
 
-const AlertsScreen = () => <PlaceholderScreen title="Alerts" icon="notifications-outline" />;
 const WishlistScreen = () => <PlaceholderScreen title="Wishlist" icon="heart-outline" />;
 
 export default function MainTabs() {
   const { data: cart } = useCartQuery();
+  const { data: unread } = useUnreadCountQuery();
   const cartCount = cart?.item_count ?? 0;
+  const unreadCount = unread?.unread_count ?? 0;
   // Respect the bottom safe area so the bar clears system nav / gesture bars.
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, 8);
@@ -61,7 +63,19 @@ export default function MainTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Alerts" component={AlertsScreen} />
+      <Tab.Screen
+        name="Alerts"
+        component={NotificationsScreen}
+        options={{
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.green,
+            color: colors.white,
+            fontFamily: fonts.bold,
+            fontSize: 10,
+          },
+        }}
+      />
       <Tab.Screen name="Wishlist" component={WishlistScreen} />
       <Tab.Screen
         name="Cart"
