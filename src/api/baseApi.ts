@@ -227,6 +227,7 @@ export type Subscription = {
   custom_days: string[];
   address_id: number;
   preferred_time: string | null;
+  payment_method: "wallet" | "cod";
   status: "active" | "paused" | "cancelled";
   start_date: string;
   daily_cost: string;
@@ -498,6 +499,35 @@ export const api = createApi({
         Array.isArray(r) ? r : r.results,
       providesTags: ["Subscription"],
     }),
+    createSubscription: build.mutation<
+      Subscription,
+      {
+        variant_id: number;
+        quantity: number;
+        frequency: string;
+        address_id: number;
+        preferred_time: string | null;
+        payment_method: string;
+        start_date: string;
+      }
+    >({
+      query: (body) => ({ url: "/subscriptions/", method: "POST", body }),
+      invalidatesTags: ["Subscription"],
+    }),
+    updateSubscription: build.mutation<
+      Subscription,
+      {
+        id: number;
+        quantity?: number;
+        frequency?: string;
+        address_id?: number;
+        preferred_time?: string | null;
+        payment_method?: string;
+      }
+    >({
+      query: ({ id, ...body }) => ({ url: `/subscriptions/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["Subscription"],
+    }),
     subscriptionSummary: build.query<SubscriptionSummary, void>({
       query: () => "/subscriptions/summary/",
       providesTags: ["Subscription"],
@@ -564,6 +594,8 @@ export const {
   useLazyWalletTopupStatusQuery,
   useWalletMockPayMutation,
   useSubscriptionsQuery,
+  useCreateSubscriptionMutation,
+  useUpdateSubscriptionMutation,
   useSubscriptionSummaryQuery,
   usePauseSubscriptionMutation,
   useResumeSubscriptionMutation,
