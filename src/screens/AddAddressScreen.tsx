@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +12,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import * as Location from "expo-location";
 
 import { useCreateAddressMutation, useUpdateAddressMutation } from "../api/baseApi";
 import { Button } from "../components/Button";
@@ -65,6 +68,41 @@ export default function AddAddressScreen() {
   const [pincode, setPincode] = useState(existing?.pincode || "");
   const [error, setError] = useState("");
   const scrollRef = useRef<ScrollView>(null);
+  const mapRef = useRef<MapView>(null);
+
+  // The exact delivery point. Pre-fills from a saved address; otherwise we ask
+  // for the device location so the pin starts where the customer is.
+  const existingLat = existing?.latitude != null ? Number(existing.latitude) : null;
+  const existingLng = existing?.longitude != null ? Number(existing.longitude) : null;
+  const [coord, setCoord] = useState<{ latitude: number; longitude: number } | null>(
+    existingLat != null && existingLng != null ? { latitude: existingLat, longitude: existingLng } : null,
+  );
+  const [locating, setLocating] = useState(false);
+
+  async function useMyLocation() {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        toast("Location permission denied — drag the pin instead.", "info");
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      setCoord(c);
+      mapRef.current?.animateToRegion({ ...c, latitudeDelta: 0.006, longitudeDelta: 0.006 }, 600);
+    } catch {
+      toast("Couldn't get your location — drag the pin instead.", "info");
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  // For a new address, center on the device location once.
+  useEffect(() => {
+    if (!coord) useMyLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const active = TYPES.find((t) => t.value === type);
 
@@ -82,6 +120,11 @@ export default function AddAddressScreen() {
       city: city.trim(),
       state: stateName.trim(),
       pincode: pincode.trim(),
+      // The pinned point wins over server geocoding. Round to 6 dp — the column
+      // is Decimal(9,6), so raw GPS precision would be rejected.
+      ...(coord
+        ? { latitude: Number(coord.latitude.toFixed(6)), longitude: Number(coord.longitude.toFixed(6)) }
+        : {}),
     };
     try {
       if (isEdit) {
@@ -181,6 +224,46 @@ export default function AddAddressScreen() {
               onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
             />
 
+            {/* Exact location — pin it on the map so delivery lands precisely. */}
+            <Text style={[styles.label, { marginTop: spacing(2) }]}>Pin your exact location</Text>
+            <Text style={styles.mapHint}>Drag the pin or tap the map to set your precise delivery spot.</Text>
+            <View style={styles.mapWrap}>
+              <MapView
+                ref={mapRef}
+                provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+                style={styles.map}
+                initialRegion={
+                  coord
+                    ? { ...coord, latitudeDelta: 0.006, longitudeDelta: 0.006 }
+                    : { latitude: 22.97, longitude: 78.65, latitudeDelta: 14, longitudeDelta: 14 }
+                }
+                onPress={(e) => setCoord(e.nativeEvent.coordinate)}
+              >
+                {coord ? (
+                  <Marker
+                    coordinate={coord}
+                    draggable
+                    onDragEnd={(e) => setCoord(e.nativeEvent.coordinate)}
+                    anchor={{ x: 0.5, y: 1 }}
+                  >
+                    <View style={styles.pin}>
+                      <Ionicons name="location" size={20} color={colors.white} />
+                    </View>
+                  </Marker>
+                ) : null}
+              </MapView>
+              <Pressable style={styles.locBtn} onPress={useMyLocation} disabled={locating}>
+                {locating ? (
+                  <ActivityIndicator size="small" color={colors.green} />
+                ) : (
+                  <>
+                    <Ionicons name="locate" size={15} color={colors.green} />
+                    <Text style={styles.locText}>My location</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Button
@@ -277,6 +360,41 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", gap: spacing(1.5) },
   col: { flex: 1 },
+
+  // Map picker
+  mapHint: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginBottom: spacing(1) },
+  mapWrap: { height: 200, borderRadius: 14, overflow: "hidden", backgroundColor: colors.bgSoft },
+  map: { flex: 1 },
+  pin: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.green,
+    borderWidth: 2,
+    borderColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  locBtn: {
+    position: "absolute",
+    right: spacing(1.25),
+    bottom: spacing(1.25),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.bg,
+    borderRadius: 999,
+    paddingVertical: spacing(0.75),
+    paddingHorizontal: spacing(1.25),
+    minWidth: 64,
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  locText: { fontFamily: fonts.bold, fontSize: 12, color: colors.green },
 
   error: { color: colors.error, fontFamily: fontsAlt.regular, fontSize: 13, marginTop: spacing(1.5) },
 });
