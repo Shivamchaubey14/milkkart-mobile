@@ -521,6 +521,13 @@ export const api = createApi({
       query: ({ id, ...body }) => ({ url: `/subscriptions/${id}/vacation/`, method: "POST", body }),
       invalidatesTags: ["Subscription"],
     }),
+    removeVacation: build.mutation<void, { id: number; vacationId: number }>({
+      query: ({ id, vacationId }) => ({
+        url: `/subscriptions/${id}/vacation/${vacationId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Subscription"],
+    }),
   }),
 });
 
@@ -562,4 +569,5 @@ export const {
   useResumeSubscriptionMutation,
   useCancelSubscriptionMutation,
   useAddVacationMutation,
+  useRemoveVacationMutation,
 } = api;
