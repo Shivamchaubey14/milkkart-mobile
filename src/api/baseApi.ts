@@ -256,6 +256,27 @@ export type SupportTicket = {
   created_at: string;
 };
 
+export type AppNotification = {
+  id: number;
+  category: "order" | "promo" | "subscription" | "system";
+  title: string;
+  body: string;
+  data: Record<string, any>;
+  is_read: boolean;
+  created_at: string;
+  read_at: string | null;
+};
+
+export type NotificationPreferences = {
+  push_enabled: boolean;
+  sms_enabled: boolean;
+  email_enabled: boolean;
+  order_updates: boolean;
+  promotions: boolean;
+  subscription_reminders: boolean;
+  updated_at: string;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -302,7 +323,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -587,6 +608,47 @@ export const api = createApi({
       query: (body) => ({ url: "/support/tickets/", method: "POST", body }),
       invalidatesTags: ["Support"],
     }),
+    notifications: build.query<AppNotification[], void>({
+      query: () => "/notifications/",
+      transformResponse: (r: AppNotification[] | Paginated<AppNotification>) =>
+        Array.isArray(r) ? r : r.results,
+      providesTags: ["Notification"],
+    }),
+    unreadCount: build.query<{ unread_count: number }, void>({
+      query: () => "/notifications/unread-count/",
+      providesTags: ["Notification"],
+    }),
+    markNotificationRead: build.mutation<AppNotification, number>({
+      query: (id) => ({ url: `/notifications/${id}/read/`, method: "POST" }),
+      invalidatesTags: ["Notification"],
+    }),
+    markAllNotificationsRead: build.mutation<{ updated: number }, void>({
+      query: () => ({ url: "/notifications/read-all/", method: "POST" }),
+      invalidatesTags: ["Notification"],
+    }),
+    notificationPreferences: build.query<NotificationPreferences, void>({
+      query: () => "/notifications/preferences/",
+      providesTags: ["NotifPref"],
+    }),
+    updateNotificationPreferences: build.mutation<
+      NotificationPreferences,
+      Partial<NotificationPreferences>
+    >({
+      query: (body) => ({ url: "/notifications/preferences/", method: "PUT", body }),
+      // Optimistic: flip the switch instantly, roll back if the save fails.
+      async onQueryStarted(patch, { dispatch, queryFulfilled }) {
+        const undo = dispatch(
+          api.util.updateQueryData("notificationPreferences", undefined, (draft) => {
+            Object.assign(draft, patch);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          undo.undo();
+        }
+      },
+    }),
   }),
 });
 
@@ -634,4 +696,10 @@ export const {
   useFaqsQuery,
   useSupportTicketsQuery,
   useCreateSupportTicketMutation,
+  useNotificationsQuery,
+  useUnreadCountQuery,
+  useMarkNotificationReadMutation,
+  useMarkAllNotificationsReadMutation,
+  useNotificationPreferencesQuery,
+  useUpdateNotificationPreferencesMutation,
 } = api;
