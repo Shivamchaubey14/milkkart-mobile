@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   CatalogProduct,
@@ -20,7 +20,8 @@ import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { useAppSelector } from "../store/hooks";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { toggleWishlist } from "../store/wishlistSlice";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const BADGE_PINK = "#ff6b81";
@@ -33,8 +34,8 @@ export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
-  const { data: banners } = useBannersQuery();
-  const { data: categories } = useCategoriesQuery();
+  const { data: banners, refetch: refetchBanners } = useBannersQuery();
+  const { data: categories, refetch: refetchCategories } = useCategoriesQuery();
 
   // null = "All"; otherwise a category id used to filter the product query.
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
@@ -54,14 +55,22 @@ export default function HomeScreen() {
     : activeCatId
       ? { category: activeCatId }
       : undefined;
-  const { data: products, isFetching } = useProductsQuery(productArg);
+  const { data: products, isFetching, refetch: refetchProducts } = useProductsQuery(productArg);
 
   const toast = useToast();
-  const { data: cart } = useCartQuery();
+  const { data: cart, refetch: refetchCart } = useCartQuery();
+
+  const onRefresh = () => {
+    refetchProducts();
+    refetchCategories();
+    refetchBanners();
+    refetchCart();
+  };
   const [addToCart] = useAddToCartMutation();
   const [updateCartItem] = useUpdateCartItemMutation();
   const [removeCartItem] = useRemoveCartItemMutation();
-  const [wishlist, setWishlist] = useState<Record<number, boolean>>({});
+  const dispatch = useAppDispatch();
+  const wishedItems = useAppSelector((s) => s.wishlist.items);
 
   // Cart line for a product, keyed by its default variant id.
   const lineFor = (p: CatalogProduct) =>
@@ -82,11 +91,28 @@ export default function HomeScreen() {
     if (line.quantity <= 1) removeCartItem(line.id);
     else updateCartItem({ item_id: line.id, quantity: line.quantity - 1 });
   }
-  const toggleWish = (id: number) => setWishlist((w) => ({ ...w, [id]: !w[id] }));
+  const isWished = (slug: string) => wishedItems.some((i) => i.slug === slug);
+  function toggleWish(p: CatalogProduct) {
+    dispatch(
+      toggleWishlist({
+        slug: p.slug,
+        name: p.name,
+        image_url: p.image_url,
+        price: p.default_variant?.price ?? "0",
+        variant_id: p.default_variant?.id,
+      }),
+    );
+  }
 
   return (
     <Screen padded={false}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
+        }
+      >
         {/* Dark header — deliver-to, avatar, search. */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
@@ -162,7 +188,7 @@ export default function HomeScreen() {
                 const mrp = Number(v?.mrp ?? 0);
                 const discount = v?.discount_percent ?? 0;
                 const qty = lineFor(p)?.quantity || 0;
-                const wished = !!wishlist[p.id];
+                const wished = isWished(p.slug);
                 const img = imageUrl(p.image_url);
                 return (
                   <Pressable
@@ -181,7 +207,7 @@ export default function HomeScreen() {
                           <Text style={styles.discountText}>{Math.round(discount)}% OFF</Text>
                         </View>
                       ) : null}
-                      <Pressable style={styles.heart} onPress={() => toggleWish(p.id)} hitSlop={8}>
+                      <Pressable style={styles.heart} onPress={() => toggleWish(p)} hitSlop={8}>
                         <Ionicons
                           name={wished ? "heart" : "heart-outline"}
                           size={16}
