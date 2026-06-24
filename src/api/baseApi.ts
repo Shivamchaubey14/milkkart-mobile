@@ -244,6 +244,18 @@ export type SubscriptionSummary = {
   amount_spent: string;
 };
 
+export type FAQ = { id: number; topic: string; question: string; answer: string; sort_order: number };
+
+export type SupportTicket = {
+  ticket_number: string;
+  order_number: string | null;
+  reason: string;
+  subject: string;
+  description: string;
+  status: "open" | "in_progress" | "resolved" | "rejected";
+  created_at: string;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -290,7 +302,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -558,6 +570,23 @@ export const api = createApi({
       }),
       invalidatesTags: ["Subscription"],
     }),
+    faqs: build.query<FAQ[], void>({
+      query: () => "/support/faqs/",
+      transformResponse: (r: FAQ[] | Paginated<FAQ>) => (Array.isArray(r) ? r : r.results),
+    }),
+    supportTickets: build.query<SupportTicket[], void>({
+      query: () => "/support/tickets/",
+      transformResponse: (r: SupportTicket[] | Paginated<SupportTicket>) =>
+        Array.isArray(r) ? r : r.results,
+      providesTags: ["Support"],
+    }),
+    createSupportTicket: build.mutation<
+      SupportTicket,
+      { reason: string; subject: string; description?: string; order_number?: string | null }
+    >({
+      query: (body) => ({ url: "/support/tickets/", method: "POST", body }),
+      invalidatesTags: ["Support"],
+    }),
   }),
 });
 
@@ -602,4 +631,7 @@ export const {
   useCancelSubscriptionMutation,
   useAddVacationMutation,
   useRemoveVacationMutation,
+  useFaqsQuery,
+  useSupportTicketsQuery,
+  useCreateSupportTicketMutation,
 } = api;

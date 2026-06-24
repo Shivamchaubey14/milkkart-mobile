@@ -7,6 +7,7 @@ import OrderDetailScreen from "../screens/OrderDetailScreen";
 import OrdersScreen from "../screens/OrdersScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SubscriptionsScreen from "../screens/SubscriptionsScreen";
+import SupportScreen from "../screens/SupportScreen";
 import TrackOrderScreen from "../screens/TrackOrderScreen";
 import WalletScreen from "../screens/WalletScreen";
 
@@ -19,6 +20,7 @@ export type ProfileStackParamList = {
   OrderDetail: { orderNumber: string };
   TrackOrder: { orderNumber: string };
   Subscriptions: undefined;
+  Support: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -34,6 +36,7 @@ export default function ProfileStack() {
       <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
       <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
       <Stack.Screen name="Subscriptions" component={SubscriptionsScreen} />
+      <Stack.Screen name="Support" component={SupportScreen} />
     </Stack.Navigator>
   );
 }
