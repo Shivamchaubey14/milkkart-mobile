@@ -4,7 +4,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ActivityIndicator,
-  Alert,
+  Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,8 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
+
+import { imageUrl } from "../api/config";
 
 import {
   Subscription,
@@ -184,6 +187,8 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
   const [from, setFrom] = useState<Date | null>(null);
   const [to, setTo] = useState<Date | null>(null);
   const [picker, setPicker] = useState<"from" | "to" | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const img = imageUrl(sub.image_url);
 
   const s = STATUS[sub.status] ?? STATUS.active;
   const cancelled = sub.status === "cancelled";
@@ -199,22 +204,14 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
     }
   }
 
-  function confirmCancel() {
-    Alert.alert("Cancel subscription?", "Deliveries will stop. You can re-subscribe anytime.", [
-      { text: "Keep it", style: "cancel" },
-      {
-        text: "Cancel it",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await cancel(sub.id).unwrap();
-            toast("Subscription cancelled.");
-          } catch (e) {
-            toast(apiErr(e), "error");
-          }
-        },
-      },
-    ]);
+  async function doCancel() {
+    setConfirmOpen(false);
+    try {
+      await cancel(sub.id).unwrap();
+      toast("Subscription cancelled.");
+    } catch (e) {
+      toast(apiErr(e), "error");
+    }
   }
 
   async function onAddVacation() {
@@ -240,7 +237,11 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
     <View style={[styles.card, cancelled && styles.cardMuted]}>
       <View style={styles.cardTop}>
         <View style={styles.thumb}>
-          <Ionicons name="cube-outline" size={20} color={colors.green} />
+          {img ? (
+            <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="contain" />
+          ) : (
+            <Ionicons name="cube-outline" size={20} color={colors.green} />
+          )}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.cardTitle} numberOfLines={2}>
@@ -272,7 +273,7 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
               loading={busy}
             />
             <ActionBtn icon="calendar-outline" label="Calendar" onPress={() => toast("Delivery calendar — coming soon.")} />
-            <ActionBtn icon="close" label="Cancel" tone="danger" onPress={confirmCancel} />
+            <ActionBtn icon="close" label="Cancel" tone="danger" onPress={() => setConfirmOpen(true)} />
           </View>
 
           {/* Vacation. */}
@@ -311,6 +312,33 @@ function SubCard({ sub, onResubscribe }: { sub: Subscription; onResubscribe: () 
           ) : null}
         </>
       )}
+
+      {/* Branded cancel confirmation — replaces the native Alert (rounded, themed). */}
+      <Modal
+        transparent
+        visible={confirmOpen}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setConfirmOpen(false)}
+      >
+        <Pressable style={styles.confirmBackdrop} onPress={() => setConfirmOpen(false)}>
+          <Pressable style={styles.confirmCard} onPress={() => {}}>
+            <View style={styles.confirmIcon}>
+              <Ionicons name="close-circle" size={28} color={colors.error} />
+            </View>
+            <Text style={styles.confirmTitle}>Cancel subscription?</Text>
+            <Text style={styles.confirmMsg}>Deliveries will stop. You can re-subscribe anytime.</Text>
+            <View style={styles.confirmActions}>
+              <Pressable style={styles.confirmKeep} onPress={() => setConfirmOpen(false)}>
+                <Text style={styles.confirmKeepText}>Keep it</Text>
+              </Pressable>
+              <Pressable style={styles.confirmCancelBtn} onPress={doCancel}>
+                <Text style={styles.confirmCancelText}>Cancel it</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -452,7 +480,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.greenTint,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
+  thumbImg: { width: "100%", height: "100%" },
   cardTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
   cardMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 3 },
   badge: { borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
@@ -543,4 +573,59 @@ const styles = StyleSheet.create({
     marginTop: spacing(1.5),
   },
   browseText: { fontFamily: fonts.bold, fontSize: 15, color: colors.green },
+
+  // Branded cancel-confirm modal
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(37,61,78,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing(3),
+  },
+  confirmCard: {
+    width: "100%",
+    maxWidth: 340,
+    backgroundColor: colors.bg,
+    borderRadius: 22,
+    padding: spacing(3),
+    alignItems: "center",
+  },
+  confirmIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.errorTint,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing(1.5),
+  },
+  confirmTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading, textAlign: "center" },
+  confirmMsg: {
+    fontFamily: fontsAlt.regular,
+    fontSize: 14,
+    color: colors.muted,
+    textAlign: "center",
+    lineHeight: 20,
+    marginTop: spacing(1),
+    marginBottom: spacing(2.5),
+  },
+  confirmActions: { flexDirection: "row", gap: spacing(1.25), alignSelf: "stretch" },
+  confirmKeep: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.bgSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmKeepText: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+  confirmCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.error,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmCancelText: { fontFamily: fonts.bold, fontSize: 15, color: colors.white },
 });

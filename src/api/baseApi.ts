@@ -220,6 +220,7 @@ export type Subscription = {
   id: number;
   variant_id: number;
   product_name: string;
+  image_url: string;
   variant_label: string;
   quantity: number;
   frequency: "daily" | "alternate" | "weekdays" | "custom";
