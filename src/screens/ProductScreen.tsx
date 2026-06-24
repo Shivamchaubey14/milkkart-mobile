@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -38,7 +39,8 @@ import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
-import { useAppSelector } from "../store/hooks";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { toggleWishlist } from "../store/wishlistSlice";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 // Delivery-time presets — the store runs mornings & evenings only. We map a chip
@@ -95,13 +97,18 @@ export default function ProductScreen() {
   const [removeCartItem] = useRemoveCartItemMutation();
   const user = useAppSelector((s) => s.auth.user);
 
-  const { data: product, isLoading } = useProductDetailQuery(slug);
-  const { data: ratingData } = useProductRatingsQuery(product?.id ?? 0, { skip: !product });
+  const { data: product, isLoading, isFetching, refetch: refetchProduct } = useProductDetailQuery(slug);
+  const { data: ratingData, refetch: refetchRatings } = useProductRatingsQuery(product?.id ?? 0, { skip: !product });
+  const onRefresh = () => {
+    refetchProduct();
+    if (product) refetchRatings();
+  };
   const [submitRating, { isLoading: submitting }] = useSubmitProductRatingMutation();
 
   const scrollRef = useRef<ScrollView>(null);
   const [variantId, setVariantId] = useState<number | null>(null);
-  const [wished, setWished] = useState(false);
+  const dispatch = useAppDispatch();
+  const wishedItems = useAppSelector((s) => s.wishlist.items);
   const [reviewStars, setReviewStars] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [subOpen, setSubOpen] = useState(false);
@@ -159,6 +166,20 @@ export default function ProductScreen() {
   const price = Number(variant?.price ?? 0);
   const mrp = Number(variant?.mrp ?? 0);
   const discount = variant?.discount_percent ?? 0;
+  const wished = wishedItems.some((i) => i.slug === product.slug);
+
+  function toggleWish() {
+    if (!product) return;
+    dispatch(
+      toggleWishlist({
+        slug: product.slug,
+        name: product.name,
+        image_url: product.image_url,
+        price: variant?.price ?? "0",
+        variant_id: variant?.id,
+      }),
+    );
+  }
 
   return (
     <Screen padded={false}>
@@ -172,6 +193,9 @@ export default function ProductScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
+        }
       >
         {/* Image with floating actions (no back button, no heart by Add to cart). */}
         <View style={styles.imageWrap}>
@@ -184,7 +208,7 @@ export default function ProductScreen() {
             <Pressable style={styles.circleBtn} hitSlop={6} onPress={() => toast("Share — coming soon.")}>
               <Ionicons name="share-social-outline" size={18} color={colors.heading} />
             </Pressable>
-            <Pressable style={styles.circleBtn} hitSlop={6} onPress={() => setWished((w) => !w)}>
+            <Pressable style={styles.circleBtn} hitSlop={6} onPress={toggleWish}>
               <Ionicons
                 name={wished ? "heart" : "heart-outline"}
                 size={18}
