@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -16,7 +16,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOrderDetailQuery } from "../api/baseApi";
+import { DeliveredCelebration } from "../components/DeliveredCelebration";
 import { Screen } from "../components/Screen";
+import { useToast } from "../components/Toast";
 import TrackingMap from "../components/TrackingMap";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
@@ -49,11 +51,19 @@ export default function TrackOrderScreen() {
   const { orderNumber } = useRoute<RouteProp<ProfileStackParamList, "TrackOrder">>().params;
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const insets = useSafeAreaInsets();
-  // Poll so the rider's position and status refresh while we watch.
+  const toast = useToast();
+  // Poll fast (~3s) so a "delivered" mark from the rider shows almost instantly;
+  // stop polling once the order reaches a terminal state.
+  const [pollMs, setPollMs] = useState(3000);
   const { data: order, isLoading, isFetching, refetch } = useOrderDetailQuery(orderNumber, {
-    pollingInterval: 10000,
+    pollingInterval: pollMs,
   });
   const [eta, setEta] = useState("");
+
+  useEffect(() => {
+    if (order && ["delivered", "cancelled", "returned"].includes(order.status)) setPollMs(0);
+    else setPollMs(3000);
+  }, [order?.status]);
 
   if (isLoading || !order) {
     return (
@@ -96,6 +106,84 @@ export default function TrackOrderScreen() {
         : tracking
           ? "Arriving soon"
           : "Preparing your order";
+
+  // Delivered → a celebration card sits where the map was, with the track below.
+  if (order.status === "delivered") {
+    return (
+      <View style={styles.celebrateScreen}>
+        <Pressable
+          style={[styles.backBtn, { top: insets.top + spacing(1) }]}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.heading} />
+        </Pressable>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.celebrateScroll,
+            { paddingTop: insets.top + spacing(7), paddingBottom: insets.bottom + spacing(3) },
+          ]}
+          refreshControl={
+            <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          }
+        >
+          {/* Celebration card */}
+          <DeliveredCelebration
+            orderNumber={order.order_number}
+            total={order.total}
+            deliveredAt={order.updated_at}
+            onRate={() => toast("Rate order — coming soon.", "info")}
+            onReorder={() => toast("Reorder — coming soon.", "info")}
+          />
+
+          {/* Track */}
+          <Text style={styles.trackLabel}>ORDER TRACK</Text>
+          <View style={styles.trackCard}>
+            <View style={styles.timeline}>
+              {STEPS.map((label, i) => {
+                const done = i < step;
+                const active = i === step;
+                return (
+                  <View key={i} style={styles.timelineStep}>
+                    <View style={styles.timelineLineWrap}>
+                      <View style={[styles.line, i <= step && i > 0 && styles.lineDone]} />
+                      <View style={[styles.node, (done || active) && styles.nodeDone]}>
+                        {done || active ? (
+                          <Ionicons name="checkmark" size={13} color={colors.white} />
+                        ) : (
+                          <View style={styles.nodeInner} />
+                        )}
+                      </View>
+                      <View style={[styles.line, i < step && styles.lineDone]} />
+                    </View>
+                    <Text style={[styles.stepLabel, (done || active) && styles.stepLabelDone]}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Address */}
+          <View style={styles.addrCard}>
+            <View style={styles.addrIcon}>
+              <Ionicons name="location-outline" size={16} color={colors.green} />
+            </View>
+            <Text style={styles.addrText}>{order.address_snapshot}</Text>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.detailsBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => navigation.navigate("OrderDetail", { orderNumber: order.order_number })}
+          >
+            <Text style={styles.detailsText}>View full order details</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.green} />
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.flex}>
@@ -228,6 +316,27 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 
+  // Delivered celebration
+  celebrateScreen: { flex: 1, backgroundColor: colors.bgSoft },
+  celebrateScroll: { paddingHorizontal: spacing(2.5) },
+  trackLabel: {
+    fontFamily: fontsAlt.extrabold,
+    fontSize: 11,
+    letterSpacing: 1,
+    color: colors.muted,
+    marginTop: spacing(3),
+    marginBottom: spacing(1.5),
+    marginLeft: spacing(0.5),
+  },
+  trackCard: {
+    backgroundColor: colors.bg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    paddingVertical: spacing(2),
+    paddingHorizontal: spacing(1),
+  },
+
   mapArea: { backgroundColor: "#e6efe9" },
   placeholder: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing(4), gap: spacing(1.5) },
   placeholderText: {
@@ -241,6 +350,7 @@ const styles = StyleSheet.create({
   backBtn: {
     position: "absolute",
     left: spacing(2),
+    zIndex: 10,
     width: 42,
     height: 42,
     borderRadius: 21,
