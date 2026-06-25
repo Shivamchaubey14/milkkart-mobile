@@ -5,7 +5,9 @@ import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View
 
 import {
   RiderDelivery,
+  useAcceptOrderMutation,
   useMeQuery,
+  usePickupOrderMutation,
   useRiderDayQuery,
   useRiderDutyQuery,
   useSetRiderDutyMutation,
@@ -38,6 +40,8 @@ export default function RiderHomeScreen() {
   const { data: me } = useMeQuery();
   const { data: duty } = useRiderDutyQuery();
   const [setRiderDuty] = useSetRiderDutyMutation();
+  const [acceptOrder, { isLoading: accepting }] = useAcceptOrderMutation();
+  const [pickupOrder, { isLoading: picking }] = usePickupOrderMutation();
 
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
@@ -67,6 +71,25 @@ export default function RiderHomeScreen() {
   const name = me?.name || "Rider";
   const initial = (name[0] || "R").toUpperCase();
   const soon = (what: string) => () => toast(`${what} — coming soon.`, "info");
+
+  // Action button advances the assignment: Accept → Pickup → Delivered.
+  // Accept/Pickup hit the backend; Delivered (OTP) is wired in a later slice.
+  const actionLabel = (s: string) => (s === "assigned" ? "Accept" : s === "accepted" ? "Pickup" : "Delivered");
+  const advance = async (d: RiderDelivery) => {
+    try {
+      if (d.status === "assigned") {
+        await acceptOrder(d.order_number).unwrap();
+        toast("Order accepted.");
+      } else if (d.status === "accepted") {
+        await pickupOrder(d.order_number).unwrap();
+        toast("Picked up — out for delivery.");
+      } else {
+        toast("Mark delivered — coming soon.", "info");
+      }
+    } catch {
+      toast("Couldn't update the order. Please try again.", "error");
+    }
+  };
 
   const stats = day?.stats;
   const active = (day?.deliveries ?? []).filter((d) => ACTIVE.includes(d.status));
@@ -203,8 +226,12 @@ export default function RiderHomeScreen() {
               <Pressable style={styles.callBtn} onPress={soon("Call")}>
                 <Ionicons name="call" size={17} color={colors.green} />
               </Pressable>
-              <Pressable style={styles.deliveredBtn} onPress={soon("Mark delivered")}>
-                <Text style={styles.deliveredText}>Delivered</Text>
+              <Pressable
+                style={({ pressed }) => [styles.deliveredBtn, (pressed || accepting || picking) && { opacity: 0.85 }]}
+                onPress={() => advance(current)}
+                disabled={accepting || picking}
+              >
+                <Text style={styles.deliveredText}>{actionLabel(current.status)}</Text>
               </Pressable>
             </View>
           </View>

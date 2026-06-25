@@ -450,6 +450,14 @@ export const api = createApi({
       query: (date) => `/rider/day/${date ? `?date=${date}` : ""}`,
       providesTags: ["RiderDay"],
     }),
+    acceptOrder: build.mutation<unknown, string>({
+      query: (orderNumber) => ({ url: `/rider/orders/${orderNumber}/accept/`, method: "POST" }),
+      invalidatesTags: ["RiderDay"],
+    }),
+    pickupOrder: build.mutation<unknown, string>({
+      query: (orderNumber) => ({ url: `/rider/orders/${orderNumber}/pickup/`, method: "POST" }),
+      invalidatesTags: ["RiderDay"],
+    }),
     addresses: build.query<Address[], void>({
       query: () => "/addresses/",
       transformResponse: (r: Address[] | Paginated<Address>) => (Array.isArray(r) ? r : r.results),
@@ -743,6 +751,8 @@ export const {
   useRiderDutyQuery,
   useSetRiderDutyMutation,
   useRiderDayQuery,
+  useAcceptOrderMutation,
+  usePickupOrderMutation,
   useAddressesQuery,
   useCreateAddressMutation,
   useUpdateAddressMutation,
