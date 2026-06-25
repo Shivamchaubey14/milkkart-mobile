@@ -202,6 +202,13 @@ export type RiderDuty = {
   last_location_at: string | null;
 };
 
+export type RiderDeliveryItem = {
+  product_name: string;
+  variant_label: string;
+  quantity: number;
+  image_url: string;
+};
+
 export type RiderDelivery = {
   order_number: string;
   address: string;
@@ -210,6 +217,9 @@ export type RiderDelivery = {
   type: "instant" | "subscription";
   is_cod: boolean;
   cod_amount: string;
+  item_count: number;
+  item_images: string[];
+  items: RiderDeliveryItem[];
 };
 
 export type RiderDay = {

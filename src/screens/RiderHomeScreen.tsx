@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   RiderDelivery,
@@ -12,8 +12,10 @@ import {
   useRiderDutyQuery,
   useSetRiderDutyMutation,
 } from "../api/baseApi";
+import { imageUrl } from "../api/config";
 import { DutyToggle } from "../components/DutyToggle";
 import { NumberPlate } from "../components/NumberPlate";
+import { OrderItemsModal } from "../components/OrderItemsModal";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
@@ -28,6 +30,7 @@ function fmtDay(d: Date) {
 const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
 const dateISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
+const TINTS = ["#e2ecf9", "#e6f5ec", "#fde2e4", "#f6efdf", "#efe6f7", "#e2f3f5"];
 const ACTIVE = ["assigned", "accepted", "picked_up"];
 const STATUS_LABEL: Record<string, string> = {
   assigned: "NEW",
@@ -45,6 +48,7 @@ export default function RiderHomeScreen() {
 
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
+  const [itemsFor, setItemsFor] = useState<RiderDelivery | null>(null);
   const { data: day, isFetching, refetch } = useRiderDayQuery(dateISO(date));
 
   // Local mirror of duty so the toggle animates immediately, then syncs.
@@ -206,17 +210,17 @@ export default function RiderHomeScreen() {
               <Text style={styles.orderNo}>#{current.order_number.slice(0, 8)}</Text>
             </View>
             <View style={styles.currentBody}>
-              <View style={styles.currentAvatar}>
-                <Ionicons name="cube-outline" size={20} color={colors.white} />
-              </View>
-              <View style={styles.currentInfo}>
-                <Text style={styles.deliveryName} numberOfLines={1}>{current.address}</Text>
-                <Text style={styles.deliveryAddr} numberOfLines={1}>
-                  {current.is_cod ? `COD · collect ${money(current.cod_amount)}` : "Prepaid"}
-                  {current.type === "subscription" ? " · Subscription" : ""}
+              <ThumbStack images={current.item_images} count={current.item_count} size={44} onPress={() => setItemsFor(current)} />
+              <View style={styles.amountCol}>
+                <Text style={styles.deliveryAmount}>{money(current.total)}</Text>
+                <Text style={current.is_cod ? styles.collectCod : styles.collectPrepaid}>
+                  {current.is_cod ? "Collect cash" : "Prepaid"}
                 </Text>
               </View>
-              <Text style={styles.deliveryAmount}>{money(current.total)}</Text>
+            </View>
+            <View style={styles.addressRow}>
+              <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginTop: 1 }} />
+              <Text style={styles.fullAddress}>{current.address}</Text>
             </View>
             <View style={styles.actionRow}>
               <Pressable style={styles.navigateBtn} onPress={soon("Navigation")}>
@@ -244,7 +248,7 @@ export default function RiderHomeScreen() {
 
         {/* Upcoming deliveries */}
         {rest.map((d) => (
-          <DeliveryRow key={d.order_number} d={d} />
+          <DeliveryRow key={d.order_number} d={d} onOpen={() => setItemsFor(d)} />
         ))}
 
         {active.length ? (
@@ -253,16 +257,53 @@ export default function RiderHomeScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      <OrderItemsModal delivery={itemsFor} onClose={() => setItemsFor(null)} />
     </Screen>
   );
 }
 
-function DeliveryRow({ d }: { d: RiderDelivery }) {
+// Overlapping product thumbnails + a "+N" chip — same treatment as the My Orders
+// card. Tap to open the order's item list.
+function ThumbStack({
+  images,
+  count,
+  size,
+  onPress,
+}: {
+  images: string[];
+  count: number;
+  size: number;
+  onPress: () => void;
+}) {
+  const shown = Math.min(count, 2);
+  const extra = Math.max(0, count - 2);
+  return (
+    <Pressable style={styles.thumbs} onPress={onPress} hitSlop={6}>
+      {Array.from({ length: Math.max(shown, 1) }).map((_, i) => {
+        const img = imageUrl(images?.[i]);
+        return (
+          <View
+            key={i}
+            style={[styles.thumb, { width: size, height: size, marginLeft: i === 0 ? 0 : -14, backgroundColor: TINTS[i % TINTS.length] }]}
+          >
+            {img ? <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="contain" /> : null}
+          </View>
+        );
+      })}
+      {extra > 0 ? (
+        <View style={[styles.thumb, styles.thumbMore, { width: size, height: size, marginLeft: -14 }]}>
+          <Text style={styles.thumbMoreText}>+{extra}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function DeliveryRow({ d, onOpen }: { d: RiderDelivery; onOpen: () => void }) {
   return (
     <View style={styles.deliveryRow}>
-      <View style={styles.rowAvatar}>
-        <Ionicons name="cube-outline" size={18} color={colors.heading} />
-      </View>
+      <ThumbStack images={d.item_images} count={d.item_count} size={40} onPress={onOpen} />
       <View style={styles.rowInfo}>
         <View style={styles.rowNameLine}>
           <Text style={styles.deliveryName} numberOfLines={1}>{d.address}</Text>
@@ -368,9 +409,19 @@ const styles = StyleSheet.create({
   currentTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   currentTag: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.3, color: colors.green },
   orderNo: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted },
-  currentBody: { flexDirection: "row", alignItems: "center", marginTop: spacing(1.5) },
-  currentAvatar: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.heading, alignItems: "center", justifyContent: "center" },
-  currentInfo: { flex: 1, marginLeft: spacing(1.5) },
+  currentBody: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: spacing(1.5) },
+  amountCol: { alignItems: "flex-end" },
+  collectCod: { fontFamily: fonts.semibold, fontSize: 12, color: "#b98421", marginTop: 2 },
+  collectPrepaid: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
+  addressRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing(1.5) },
+  fullAddress: { flex: 1, fontFamily: fontsAlt.regular, fontSize: 13, color: colors.text, lineHeight: 19 },
+
+  // Product thumbnail stack (like My Orders)
+  thumbs: { flexDirection: "row" },
+  thumb: { borderRadius: 10, borderWidth: 2, borderColor: colors.bg, overflow: "hidden" },
+  thumbImg: { width: "100%", height: "100%" },
+  thumbMore: { backgroundColor: colors.lineSoft, alignItems: "center", justifyContent: "center" },
+  thumbMoreText: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
   deliveryName: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
   deliveryAddr: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   deliveryAmount: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading, marginLeft: spacing(1) },
@@ -383,7 +434,6 @@ const styles = StyleSheet.create({
 
   // Upcoming delivery rows
   deliveryRow: { flexDirection: "row", alignItems: "center", backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginTop: spacing(1.25) },
-  rowAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bgSoft, alignItems: "center", justifyContent: "center" },
   rowInfo: { flex: 1, marginLeft: spacing(1.5) },
   rowNameLine: { flexDirection: "row", alignItems: "center", gap: spacing(1) },
   payPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
