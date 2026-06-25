@@ -184,6 +184,15 @@ export type OrderDetail = {
   updated_at: string;
 };
 
+export type OrderReview = {
+  id: number;
+  order_rating: number;
+  rider_rating: number | null;
+  comment: string;
+  photos: string[];
+  created_at: string;
+};
+
 export type WalletTransaction = {
   id: number;
   type: string;
@@ -376,6 +385,23 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ["Rating"],
+    }),
+    // Existing review for an order (404 when not yet rated — callers treat the
+    // absence of data as "not rated").
+    orderRating: build.query<OrderReview, string>({
+      query: (orderNumber) => `/support/orders/${orderNumber}/rating/`,
+      providesTags: ["Order"],
+    }),
+    submitOrderRating: build.mutation<
+      OrderReview,
+      { orderNumber: string; order_rating: number; rider_rating?: number | null; comment?: string }
+    >({
+      query: ({ orderNumber, ...body }) => ({
+        url: `/support/orders/${orderNumber}/rating/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Order"],
     }),
     addresses: build.query<Address[], void>({
       query: () => "/addresses/",
@@ -665,6 +691,8 @@ export const {
   useProductDetailQuery,
   useProductRatingsQuery,
   useSubmitProductRatingMutation,
+  useOrderRatingQuery,
+  useSubmitOrderRatingMutation,
   useAddressesQuery,
   useCreateAddressMutation,
   useUpdateAddressMutation,

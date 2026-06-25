@@ -6,6 +6,8 @@ import { ActivityIndicator, Image, Linking, Pressable, RefreshControl, ScrollVie
 
 import { OrderItemDetail, useOrderDetailQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
+import { DeliveredCelebration } from "../components/DeliveredCelebration";
+import { NumberPlate } from "../components/NumberPlate";
 import { Screen } from "../components/Screen";
 import TrackingMap from "../components/TrackingMap";
 import { useToast } from "../components/Toast";
@@ -123,6 +125,19 @@ export default function OrderDetailScreen() {
             </View>
           ) : (
             <>
+              {/* Delivered → celebration card sits at the top, above the track. */}
+              {order.status === "delivered" ? (
+                <View style={styles.celebrateWrap}>
+                  <DeliveredCelebration
+                    orderNumber={order.order_number}
+                    total={order.total}
+                    deliveredAt={order.updated_at}
+                    riderName={rider?.rider_name}
+                    onReorder={() => toast("Reorder — coming soon.")}
+                  />
+                </View>
+              ) : null}
+
               {/* Live tracking map (OSM tiles + OSRM road route, like the web) */}
               {showMap ? (
                 <View style={styles.mapWrap}>
@@ -205,20 +220,23 @@ export default function OrderDetailScreen() {
                 </View>
               ) : null}
 
-              {/* Delivery partner — name, vehicle & phone. */}
+              {/* Delivery partner — name, role + vehicle plate, and phone. */}
               {rider?.rider_name ? (
                 <View style={styles.card}>
                   <View style={styles.partnerRow}>
                     <View style={styles.partnerAvatar}>
                       <Text style={styles.partnerInitial}>{(rider.rider_name[0] || "R").toUpperCase()}</Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.partnerName}>{rider.rider_name}</Text>
-                      <Text style={styles.partnerRole}>
-                        Delivery partner{rider.vehicle_number ? ` · ${rider.vehicle_number}` : ""}
-                      </Text>
-                      {rider.rider_phone ? <Text style={styles.partnerPhone}>{rider.rider_phone}</Text> : null}
+                    <View style={styles.partnerInfo}>
+                      <Text style={styles.partnerName} numberOfLines={1}>{rider.rider_name}</Text>
+                      <Text style={styles.partnerRole}>Delivery partner</Text>
+                      {rider.rider_phone ? (
+                        <Text style={styles.partnerPhone}>{rider.rider_phone}</Text>
+                      ) : null}
                     </View>
+                    {rider.vehicle_number ? (
+                      <NumberPlate number={rider.vehicle_number} style={{ marginLeft: spacing(1.25) }} />
+                    ) : null}
                     <Pressable
                       style={styles.callBtn}
                       onPress={() => Linking.openURL(`tel:${rider.rider_phone}`)}
@@ -259,18 +277,15 @@ export default function OrderDetailScreen() {
             <BillRow label="Total" value={money(order.total)} strong />
           </View>
 
-          {/* Actions */}
-          {order.status !== "cancelled" ? (
+          {/* Actions — hidden once delivered (the celebration card carries
+              Rate order / Reorder); shown for active orders to track + get help. */}
+          {order.status !== "cancelled" && order.status !== "delivered" ? (
             <View style={styles.actions}>
               <Pressable
                 style={({ pressed }) => [styles.trackBtn, pressed && { opacity: 0.85 }]}
-                onPress={() =>
-                  order.status === "delivered"
-                    ? toast("Reorder — coming soon.")
-                    : navigation.navigate("TrackOrder", { orderNumber: order.order_number })
-                }
+                onPress={() => navigation.navigate("TrackOrder", { orderNumber: order.order_number })}
               >
-                <Text style={styles.trackText}>{order.status === "delivered" ? "Reorder" : "Track Order"}</Text>
+                <Text style={styles.trackText}>Track Order</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.helpBtn, pressed && { opacity: 0.7 }]}
@@ -426,10 +441,16 @@ const styles = StyleSheet.create({
   partnerRow: { flexDirection: "row", alignItems: "center" },
   partnerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.heading, alignItems: "center", justifyContent: "center" },
   partnerInitial: { fontFamily: fonts.bold, fontSize: 18, color: colors.white },
-  partnerName: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading, marginLeft: spacing(1.5) },
-  partnerRole: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginLeft: spacing(1.5), marginTop: 1 },
-  partnerPhone: { fontFamily: fonts.semibold, fontSize: 13, color: colors.green, marginLeft: spacing(1.5), marginTop: 2 },
-  callBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
+  partnerInfo: { flexShrink: 1, marginLeft: spacing(1.5) },
+  partnerName: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
+  partnerRole: { fontFamily: fontsAlt.regular, fontSize: 10, color: colors.muted, marginTop: 1 },
+  partnerPhone: { fontFamily: fonts.semibold, fontSize: 11, color: colors.green, marginTop: 2 },
+  // Call button. marginLeft is the gap between the plate and this icon — raise it
+  // for more space, lower it for less.
+  callBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center", marginLeft: spacing(1) },
+
+
+  celebrateWrap: { marginBottom: spacing(2) },
 
   secLabel: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 1, color: colors.muted, marginTop: spacing(3), marginBottom: spacing(1) },
 

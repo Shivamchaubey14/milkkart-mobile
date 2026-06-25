@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ActivityIndicator,
-  Animated,
   Dimensions,
   Image,
   Pressable,
@@ -47,21 +46,6 @@ export default function CartScreen() {
   const [removeCoupon] = useRemoveCouponMutation();
 
   const [code, setCode] = useState("");
-
-  const scrollRef = useRef<ScrollView>(null);
-
-  // Gentle bounce for the "scroll for items" down-arrow hint.
-  const bounce = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounce, { toValue: 4, duration: 600, useNativeDriver: true }),
-        Animated.timing(bounce, { toValue: 0, duration: 600, useNativeDriver: true }),
-      ]),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [bounce]);
 
   const lines = cart?.items ?? [];
   const bill = cart?.bill;
@@ -125,9 +109,8 @@ export default function CartScreen() {
           </View>
         ) : (
           <>
-            {/* Header + product list scroll together. */}
+            {/* Everything scrolls as one: full product list, then bill details at the end. */}
             <ScrollView
-              ref={scrollRef}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
               refreshControl={
@@ -150,20 +133,9 @@ export default function CartScreen() {
                   />
                 ))}
               </View>
-            </ScrollView>
 
-            {/* Fixed footer: coupon + bill details + checkout. */}
-            <View style={styles.footer}>
-              <Animated.View style={[styles.scrollHint, { transform: [{ translateY: bounce }] }]}>
-                <Pressable
-                  style={styles.scrollPill}
-                  onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
-                >
-                  <Text style={styles.scrollPillText}>Scroll down for more</Text>
-                  <Ionicons name="chevron-down" size={15} color={colors.error} />
-                </Pressable>
-              </Animated.View>
-
+              {/* Coupon + bill details + checkout, flowing right after the products. */}
+              <View style={styles.footer}>
               {cart?.coupon_code ? (
                 <View style={styles.couponApplied}>
                   <Ionicons name="pricetag" size={16} color={colors.green} />
@@ -225,7 +197,8 @@ export default function CartScreen() {
                   <Ionicons name="arrow-forward" size={18} color={colors.white} />
                 </View>
               </Pressable>
-            </View>
+              </View>
+            </ScrollView>
           </>
         )}
         {freeDelivery ? (
@@ -349,11 +322,11 @@ const styles = StyleSheet.create({
   stepBtn: { width: 26, height: 30, alignItems: "center", justifyContent: "center" },
   stepQty: { fontFamily: fonts.bold, fontSize: 14, color: colors.white, minWidth: 18, textAlign: "center" },
 
-  // Footer
+  // Coupon + bill + checkout block (flows after the product list)
   footer: {
     paddingHorizontal: spacing(2.5),
     paddingTop: spacing(1),
-    paddingBottom: spacing(1.5),
+    paddingBottom: spacing(2.5),
     backgroundColor: colors.bg,
   },
   couponRow: { flexDirection: "row", gap: spacing(1) },
@@ -390,19 +363,6 @@ const styles = StyleSheet.create({
   },
   couponAppliedText: { flex: 1, fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
   couponRemove: { fontFamily: fonts.bold, fontSize: 13, color: colors.error },
-
-  // Bouncing pill hint that the list above scrolls.
-  scrollHint: { alignItems: "center", paddingBottom: spacing(1) },
-  scrollPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: colors.errorTint,
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 14,
-  },
-  scrollPillText: { fontFamily: fonts.bold, fontSize: 12, color: colors.error },
 
   // Inline free-delivery highlight inside the bill card.
   freeRow: { backgroundColor: colors.greenTint, borderRadius: 8, paddingHorizontal: spacing(1), marginVertical: 1 },

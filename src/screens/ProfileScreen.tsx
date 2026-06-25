@@ -69,12 +69,25 @@ const MENU: MenuItem[] = [
   },
 ];
 
+type RiderStat = { key: string; icon: IoniconName; tint: string; fg: string; title: string; value: string; valueColor: string };
+
+// Rider-only stat rows shown after "Profile & addresses" (mock values for now).
+const RIDER_STATS: RiderStat[] = [
+  { key: "delivered", icon: "checkmark-done-outline", tint: colors.greenTint, fg: colors.green, title: "Total Delivered", value: "128", valueColor: colors.heading },
+  { key: "pending", icon: "time-outline", tint: "#fff4d6", fg: "#b98421", title: "Total Pending", value: "4", valueColor: colors.heading },
+  { key: "earnings", icon: "cash-outline", tint: colors.greenTint, fg: colors.green, title: "Total Earnings", value: "₹12,480.00", valueColor: colors.green },
+  { key: "pendingSince", icon: "calendar-outline", tint: colors.lineSoft, fg: colors.heading, title: "Total Pending Since", value: "24 Jun", valueColor: colors.muted },
+];
+
 export default function ProfileScreen() {
   const user = useAppSelector((s) => s.auth.user);
   const dispatch = useAppDispatch();
   const toast = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { data: wallet, isFetching, refetch } = useWalletQuery();
+  const isRider = !!user?.is_rider;
+  // Riders see stat rows, not the wallet/orders menu — skip the wallet fetch.
+  const { data: wallet, isFetching, refetch } = useWalletQuery(undefined, { skip: isRider });
+  const menu = isRider ? MENU.filter((m) => m.key === "profile") : MENU;
 
   const initial = (user?.name?.trim()?.[0] || "U").toUpperCase();
 
@@ -113,7 +126,7 @@ export default function ProfileScreen() {
 
         {/* Menu list */}
         <View style={styles.menu}>
-          {MENU.map((m) => (
+          {menu.map((m) => (
             <Pressable
               key={m.key}
               style={styles.item}
@@ -148,6 +161,21 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
           ))}
+
+          {/* Rider stats — shown only for delivery partners. */}
+          {isRider
+            ? RIDER_STATS.map((s) => (
+                <View key={s.key} style={styles.item}>
+                  <View style={[styles.itemIcon, { backgroundColor: s.tint }]}>
+                    <Ionicons name={s.icon} size={20} color={s.fg} />
+                  </View>
+                  <View style={styles.itemText}>
+                    <Text style={styles.itemTitle}>{s.title}</Text>
+                  </View>
+                  <Text style={[styles.statValue, { color: s.valueColor }]}>{s.value}</Text>
+                </View>
+              ))
+            : null}
 
           {/* Logout */}
           <Pressable style={styles.logout} onPress={onLogout}>
@@ -240,6 +268,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: fonts.bold, fontSize: 11, color: colors.green },
   value: { fontFamily: fonts.bold, fontSize: 15, color: colors.green, marginRight: spacing(0.75) },
+  statValue: { fontFamily: fonts.bold, fontSize: 15 },
 
   // Logout -------------------------------------------------------------------
   logout: {
