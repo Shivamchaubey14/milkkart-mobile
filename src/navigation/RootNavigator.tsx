@@ -1,11 +1,14 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import { useMeQuery } from "../api/baseApi";
 import CheckoutScreen from "../screens/CheckoutScreen";
 import LoginScreen from "../screens/auth/LoginScreen";
 import ProductScreen from "../screens/ProductScreen";
+import SplashScreen from "../screens/SplashScreen";
 import { useAppSelector } from "../store/hooks";
 import MainTabs from "./MainTabs";
+import RiderTabs from "./RiderTabs";
 
 export type RootStackParamList = {
   Main: undefined;
@@ -18,12 +21,21 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   const access = useAppSelector((s) => s.auth.access);
+  // Profile drives which tab set to show. It's warmed on bootstrap/login, so it
+  // usually resolves instantly; wait on a cold start to avoid a wrong-nav flash.
+  const { data: me, isLoading } = useMeQuery(undefined, { skip: !access });
+
+  if (access && !me && isLoading) {
+    return <SplashScreen />;
+  }
+  const isRider = !!me?.is_rider;
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {access ? (
           <>
-            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Main" component={isRider ? RiderTabs : MainTabs} />
             {/* Full-screen (over the tabs) so the keyboard avoidance on the
                 review form isn't fighting the bottom tab bar. */}
             <Stack.Screen
