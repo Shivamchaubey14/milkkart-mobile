@@ -131,7 +131,7 @@ export default function OrderDetailScreen() {
                     orderNumber={order.order_number}
                     total={order.total}
                     deliveredAt={order.updated_at}
-                    onRate={() => toast("Rate order — coming soon.")}
+                    riderName={rider?.rider_name}
                     onReorder={() => toast("Reorder — coming soon.")}
                   />
                 </View>

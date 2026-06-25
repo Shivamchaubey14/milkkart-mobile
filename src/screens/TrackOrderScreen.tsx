@@ -134,7 +134,7 @@ export default function TrackOrderScreen() {
             orderNumber={order.order_number}
             total={order.total}
             deliveredAt={order.updated_at}
-            onRate={() => toast("Rate order — coming soon.", "info")}
+            riderName={rider?.rider_name}
             onReorder={() => toast("Reorder — coming soon.", "info")}
           />
 

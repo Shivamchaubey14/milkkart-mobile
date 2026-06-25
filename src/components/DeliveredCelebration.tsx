@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from "lottie-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useOrderRatingQuery } from "../api/baseApi";
+import { RateOrderModal } from "./RateOrderModal";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
@@ -13,14 +16,24 @@ type Props = {
   total: number | string;
   /** ISO timestamp of the delivery (we use the order's last update). */
   deliveredAt: string;
-  onRate: () => void;
+  /** Rider name enables the optional delivery-partner rating in the modal. */
+  riderName?: string | null;
   onReorder: () => void;
 };
 
-// The "Delivered" hero card — a one-shot gift Lottie, a check badge, the
-// handover time, an order pill, and Rate order / Reorder actions. Shared by the
-// Track and Order Details screens so they always match.
-export function DeliveredCelebration({ orderNumber, total, deliveredAt, onRate, onReorder }: Props) {
+// The "Delivered" hero card — a looping gift Lottie, a check badge, the handover
+// time, an order pill, and Rate order / Reorder actions. Rate order opens a
+// bottom-sheet rating modal. Shared by the Track and Order Details screens.
+export function DeliveredCelebration({ orderNumber, total, deliveredAt, riderName, onReorder }: Props) {
+  const [rateOpen, setRateOpen] = useState(false);
+  const [rated, setRated] = useState(false);
+
+  // Reflect a previously-saved rating on load (the GET 404s when not yet rated).
+  const { data: existingReview } = useOrderRatingQuery(orderNumber);
+  useEffect(() => {
+    if (existingReview) setRated(true);
+  }, [existingReview]);
+
   return (
     <View style={styles.card}>
       <View style={styles.heroArt}>
@@ -28,7 +41,7 @@ export function DeliveredCelebration({ orderNumber, total, deliveredAt, onRate, 
           <LottieView
             source={require("../assets/lottie/delivered.json")}
             autoPlay
-            loop={false}
+            loop
             style={styles.heroLottie}
           />
         </View>
@@ -50,13 +63,34 @@ export function DeliveredCelebration({ orderNumber, total, deliveredAt, onRate, 
       </View>
 
       <View style={styles.btns}>
-        <Pressable style={({ pressed }) => [styles.rateBtn, pressed && { opacity: 0.9 }]} onPress={onRate}>
-          <Text style={styles.rateText}>Rate order</Text>
+        <Pressable
+          style={({ pressed }) => [styles.rateBtn, !rated && pressed && { opacity: 0.9 }]}
+          onPress={() => setRateOpen(true)}
+          disabled={rated}
+        >
+          {rated ? (
+            <View style={styles.rateRated}>
+              <Ionicons name="star" size={15} color={colors.white} />
+              <Text style={styles.rateText}>Rated</Text>
+            </View>
+          ) : (
+            <Text style={styles.rateText}>Rate order</Text>
+          )}
         </Pressable>
         <Pressable style={({ pressed }) => [styles.reorderBtn, pressed && { opacity: 0.7 }]} onPress={onReorder}>
           <Text style={styles.reorderText}>Reorder</Text>
         </Pressable>
       </View>
+
+      <RateOrderModal
+        visible={rateOpen}
+        orderNumber={orderNumber}
+        riderName={riderName}
+        onClose={(submitted) => {
+          setRateOpen(false);
+          if (submitted) setRated(true);
+        }}
+      />
     </View>
   );
 }
@@ -64,71 +98,73 @@ export function DeliveredCelebration({ orderNumber, total, deliveredAt, onRate, 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.bg,
-    borderRadius: 24,
-    paddingHorizontal: spacing(3),
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    paddingHorizontal: spacing(2.25),
     paddingTop: spacing(2),
-    paddingBottom: spacing(3),
+    paddingBottom: spacing(2.25),
     alignItems: "center",
     shadowColor: "#253d4e",
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  heroArt: { alignItems: "center", marginBottom: spacing(0.5) },
+  heroArt: { alignItems: "center", marginBottom: spacing(0.25) },
   heroCircle: {
-    width: 168,
-    height: 168,
-    borderRadius: 84,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: colors.greenTint,
     alignItems: "center",
     justifyContent: "center",
   },
-  heroLottie: { width: 210, height: 210 },
+  heroLottie: { width: 118, height: 118 },
   heroCheck: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.green,
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -26,
+    marginTop: -18,
     shadowColor: colors.green,
     shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-  title: { fontFamily: fonts.bold, fontSize: 26, color: colors.heading, marginTop: spacing(1.5) },
+  title: { fontFamily: fonts.bold, fontSize: 19, color: colors.heading, marginTop: spacing(1) },
   sub: {
     fontFamily: fontsAlt.regular,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.text,
     textAlign: "center",
-    lineHeight: 21,
-    marginTop: spacing(1),
-    paddingHorizontal: spacing(1),
+    lineHeight: 19,
+    marginTop: 5,
+    paddingHorizontal: spacing(0.75),
   },
   bold: { fontFamily: fonts.bold, color: colors.heading },
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
     backgroundColor: colors.greenTint,
     borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    marginTop: spacing(2.5),
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    marginTop: spacing(1.75),
   },
-  pillDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green },
-  pillText: { fontFamily: fonts.bold, fontSize: 13, color: colors.greenDark },
-  btns: { flexDirection: "row", gap: spacing(1.5), marginTop: spacing(2.5), alignSelf: "stretch" },
+  pillDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
+  pillText: { fontFamily: fonts.bold, fontSize: 12, color: colors.greenDark },
+  btns: { flexDirection: "row", gap: spacing(1.25), marginTop: spacing(2), alignSelf: "stretch" },
   rateBtn: {
     flex: 1,
-    height: 54,
-    borderRadius: 16,
+    height: 46,
+    borderRadius: 12,
     backgroundColor: colors.green,
     alignItems: "center",
     justifyContent: "center",
@@ -138,16 +174,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  rateText: { fontFamily: fonts.bold, fontSize: 15, color: colors.white },
+  rateRated: { flexDirection: "row", alignItems: "center", gap: 6 },
+  rateText: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
   reorderBtn: {
     flex: 1,
-    height: 54,
-    borderRadius: 16,
+    height: 46,
+    borderRadius: 12,
     backgroundColor: colors.bg,
     borderWidth: 1.5,
     borderColor: colors.line,
     alignItems: "center",
     justifyContent: "center",
   },
-  reorderText: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+  reorderText: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
 });
