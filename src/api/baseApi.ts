@@ -203,9 +203,11 @@ export type RiderDuty = {
 };
 
 export type RiderDeliveryItem = {
+  id: number;
   product_name: string;
   variant_label: string;
   quantity: number;
+  is_returned: boolean;
   image_url: string;
 };
 
@@ -466,6 +468,14 @@ export const api = createApi({
     }),
     pickupOrder: build.mutation<unknown, string>({
       query: (orderNumber) => ({ url: `/rider/orders/${orderNumber}/pickup/`, method: "POST" }),
+      invalidatesTags: ["RiderDay"],
+    }),
+    deliverOrder: build.mutation<unknown, { orderNumber: string; otp: string; proof_photo?: string }>({
+      query: ({ orderNumber, ...body }) => ({ url: `/rider/orders/${orderNumber}/deliver/`, method: "POST", body }),
+      invalidatesTags: ["RiderDay"],
+    }),
+    returnOrder: build.mutation<unknown, { orderNumber: string; item_ids: number[]; reason?: string }>({
+      query: ({ orderNumber, ...body }) => ({ url: `/rider/orders/${orderNumber}/return/`, method: "POST", body }),
       invalidatesTags: ["RiderDay"],
     }),
     addresses: build.query<Address[], void>({
@@ -763,6 +773,8 @@ export const {
   useRiderDayQuery,
   useAcceptOrderMutation,
   usePickupOrderMutation,
+  useDeliverOrderMutation,
+  useReturnOrderMutation,
   useAddressesQuery,
   useCreateAddressMutation,
   useUpdateAddressMutation,

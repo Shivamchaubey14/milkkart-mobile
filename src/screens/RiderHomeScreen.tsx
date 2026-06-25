@@ -13,6 +13,7 @@ import {
   useSetRiderDutyMutation,
 } from "../api/baseApi";
 import { imageUrl } from "../api/config";
+import { DeliverModal } from "../components/DeliverModal";
 import { DutyToggle } from "../components/DutyToggle";
 import { NumberPlate } from "../components/NumberPlate";
 import { OrderItemsModal } from "../components/OrderItemsModal";
@@ -49,6 +50,7 @@ export default function RiderHomeScreen() {
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [itemsFor, setItemsFor] = useState<RiderDelivery | null>(null);
+  const [deliverFor, setDeliverFor] = useState<RiderDelivery | null>(null);
   const { data: day, isFetching, refetch } = useRiderDayQuery(dateISO(date));
 
   // Local mirror of duty so the toggle animates immediately, then syncs.
@@ -80,15 +82,17 @@ export default function RiderHomeScreen() {
   // Accept/Pickup hit the backend; Delivered (OTP) is wired in a later slice.
   const actionLabel = (s: string) => (s === "assigned" ? "Accept" : s === "accepted" ? "Pickup" : "Delivered");
   const advance = async (d: RiderDelivery) => {
+    if (d.status === "picked_up") {
+      setDeliverFor(d); // open the OTP + proof / return sheet
+      return;
+    }
     try {
       if (d.status === "assigned") {
         await acceptOrder(d.order_number).unwrap();
         toast("Order accepted.");
-      } else if (d.status === "accepted") {
+      } else {
         await pickupOrder(d.order_number).unwrap();
         toast("Picked up — out for delivery.");
-      } else {
-        toast("Mark delivered — coming soon.", "info");
       }
     } catch {
       toast("Couldn't update the order. Please try again.", "error");
@@ -259,6 +263,7 @@ export default function RiderHomeScreen() {
       </ScrollView>
 
       <OrderItemsModal delivery={itemsFor} onClose={() => setItemsFor(null)} />
+      <DeliverModal delivery={deliverFor} onClose={() => setDeliverFor(null)} />
     </Screen>
   );
 }
