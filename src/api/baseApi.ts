@@ -193,6 +193,40 @@ export type OrderReview = {
   created_at: string;
 };
 
+// Delivery-partner (rider) shapes — see apps/delivery.
+export type RiderDuty = {
+  vehicle_number: string;
+  is_on_duty: boolean;
+  current_lat: string | null;
+  current_lng: string | null;
+  last_location_at: string | null;
+};
+
+export type RiderDelivery = {
+  order_number: string;
+  address: string;
+  total: string;
+  status: string;
+  type: "instant" | "subscription";
+  is_cod: boolean;
+  cod_amount: string;
+};
+
+export type RiderDay = {
+  date: string;
+  stats: {
+    total: number;
+    delivered: number;
+    pending: number;
+    returned: number;
+    earnings: string;
+    rider_fee: string;
+    cod_to_collect: string;
+    cod_collected: string;
+  };
+  deliveries: RiderDelivery[];
+};
+
 export type WalletTransaction = {
   id: number;
   type: string;
@@ -333,7 +367,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -402,6 +436,19 @@ export const api = createApi({
         body,
       }),
       invalidatesTags: ["Order"],
+    }),
+    // Rider: duty status / vehicle, day summary (stats + COD + deliveries).
+    riderDuty: build.query<RiderDuty, void>({
+      query: () => "/rider/duty/",
+      providesTags: ["RiderDuty"],
+    }),
+    setRiderDuty: build.mutation<RiderDuty, { on_duty: boolean; lat?: number; lng?: number }>({
+      query: (body) => ({ url: "/rider/duty/", method: "POST", body }),
+      invalidatesTags: ["RiderDuty"],
+    }),
+    riderDay: build.query<RiderDay, string | undefined>({
+      query: (date) => `/rider/day/${date ? `?date=${date}` : ""}`,
+      providesTags: ["RiderDay"],
     }),
     addresses: build.query<Address[], void>({
       query: () => "/addresses/",
@@ -693,6 +740,9 @@ export const {
   useSubmitProductRatingMutation,
   useOrderRatingQuery,
   useSubmitOrderRatingMutation,
+  useRiderDutyQuery,
+  useSetRiderDutyMutation,
+  useRiderDayQuery,
   useAddressesQuery,
   useCreateAddressMutation,
   useUpdateAddressMutation,
