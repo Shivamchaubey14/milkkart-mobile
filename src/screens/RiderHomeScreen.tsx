@@ -3,6 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { useMeQuery } from "../api/baseApi";
+import { DutyToggle } from "../components/DutyToggle";
+import { NumberPlate } from "../components/NumberPlate";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
@@ -47,43 +49,42 @@ export default function RiderHomeScreen() {
         <View style={styles.riderCard}>
           <View style={styles.blob} />
           <View style={styles.riderTop}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
-            </View>
-            <View style={styles.riderInfo}>
-              <Text style={styles.riderName} numberOfLines={1}>{name}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>Rider ID · MK-2048</Text>
-                <Ionicons name="star" size={12} color={colors.yellow} style={{ marginLeft: 6 }} />
+            <View style={styles.avatarCol}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </View>
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={12} color={colors.yellow} />
                 <Text style={styles.ratingText}>4.3</Text>
               </View>
             </View>
-            <Pressable hitSlop={8} onPress={soon("Notifications")}>
-              <Ionicons name="notifications-outline" size={20} color={colors.white} />
-            </Pressable>
+
+            <View style={styles.riderInfo}>
+              <Text style={styles.riderName} numberOfLines={1}>{name}</Text>
+              <View style={styles.infoLine}>
+                <Ionicons name="call-outline" size={12} color="rgba(255,255,255,0.55)" />
+                <Text style={styles.infoText} numberOfLines={1}>{me?.phone || "+91 90000 00000"}</Text>
+              </View>
+              <View style={styles.infoLine}>
+                <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.55)" />
+                <Text style={styles.infoText} numberOfLines={1}>Faizabad, UP</Text>
+              </View>
+            </View>
+
+            <NumberPlate number="UP78 AB 2048" style={styles.plate} />
           </View>
 
           <View style={styles.dutyRow}>
-            {onDuty ? (
-              <>
-                <View style={[styles.dutyPill, styles.dutyOn]}>
-                  <View style={styles.dutyDot} />
-                  <Text style={styles.dutyTextOn}>On duty</Text>
-                </View>
-                <Pressable style={[styles.dutyPill, styles.dutyGhost]} onPress={() => setOnDuty(false)}>
-                  <Text style={styles.dutyTextGhost}>Go off duty</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <View style={[styles.dutyPill, styles.dutyGhost]}>
-                  <Text style={styles.dutyTextGhost}>Off duty</Text>
-                </View>
-                <Pressable style={[styles.dutyPill, styles.dutyOn]} onPress={() => setOnDuty(true)}>
-                  <Text style={styles.dutyTextOn}>Go on duty</Text>
-                </Pressable>
-              </>
-            )}
+            <View style={styles.dutyTextWrap}>
+              <View style={styles.dutyLabelRow}>
+                <View style={[styles.statusDot, { backgroundColor: onDuty ? colors.green : "rgba(255,255,255,0.4)" }]} />
+                <Text style={styles.dutyLabel}>{onDuty ? "On duty" : "Off duty"}</Text>
+              </View>
+              <Text style={styles.dutyHint}>
+                {onDuty ? "Accepting deliveries" : "Not accepting deliveries"}
+              </Text>
+            </View>
+            <DutyToggle value={onDuty} onChange={setOnDuty} />
           </View>
         </View>
 
@@ -215,21 +216,32 @@ const styles = StyleSheet.create({
   // Rider identity card
   riderCard: { backgroundColor: colors.heading, borderRadius: 22, padding: spacing(2.25), overflow: "hidden" },
   blob: { position: "absolute", top: -40, right: -28, width: 130, height: 130, borderRadius: 65, backgroundColor: "rgba(255,255,255,0.05)" },
-  riderTop: { flexDirection: "row", alignItems: "center" },
+  riderTop: { flexDirection: "row", alignItems: "flex-start" },
+  avatarCol: { alignItems: "center" },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.green, alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: fonts.bold, fontSize: 20, color: colors.white },
-  riderInfo: { flex: 1, marginLeft: spacing(1.5) },
+  ratingRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 6 },
+  ratingText: { fontFamily: fonts.bold, fontSize: 13, color: colors.yellow },
+  riderInfo: { flex: 1, marginLeft: spacing(1.5), paddingTop: 2 },
   riderName: { fontFamily: fonts.bold, fontSize: 17, color: colors.white },
-  metaRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
-  metaText: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)" },
-  ratingText: { fontFamily: fonts.bold, fontSize: 12, color: colors.yellow, marginLeft: 3 },
-  dutyRow: { flexDirection: "row", gap: spacing(1.25), marginTop: spacing(2) },
-  dutyPill: { flex: 1, height: 40, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  dutyOn: { backgroundColor: colors.green },
-  dutyGhost: { backgroundColor: "rgba(255,255,255,0.08)" },
-  dutyDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.white },
-  dutyTextOn: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
-  dutyTextGhost: { fontFamily: fonts.bold, fontSize: 14, color: "rgba(255,255,255,0.7)" },
+  infoLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  infoText: { flexShrink: 1, fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.7)" },
+  plate: { marginLeft: spacing(1.5), alignSelf: "flex-start" },
+  dutyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing(2),
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    paddingVertical: spacing(1.25),
+    paddingHorizontal: spacing(1.75),
+  },
+  dutyTextWrap: { flex: 1 },
+  dutyLabelRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  dutyLabel: { fontFamily: fonts.bold, fontSize: 15, color: colors.white },
+  dutyHint: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2, marginLeft: 15 },
 
   // Section headers
   sectionHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: spacing(2.75), marginBottom: spacing(1.25) },

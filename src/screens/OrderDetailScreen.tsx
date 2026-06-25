@@ -7,11 +7,12 @@ import { ActivityIndicator, Image, Linking, Pressable, RefreshControl, ScrollVie
 import { OrderItemDetail, useOrderDetailQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { DeliveredCelebration } from "../components/DeliveredCelebration";
+import { NumberPlate } from "../components/NumberPlate";
 import { Screen } from "../components/Screen";
 import TrackingMap from "../components/TrackingMap";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
-import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
+import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 const TINTS = ["#f6efdf", "#e2ecf9", "#e6f5ec", "#fde2e4", "#efe6f7", "#e2f3f5"];
@@ -233,7 +234,9 @@ export default function OrderDetailScreen() {
                         <Text style={styles.partnerPhone}>{rider.rider_phone}</Text>
                       ) : null}
                     </View>
-                    {rider.vehicle_number ? <NumberPlate number={rider.vehicle_number} /> : null}
+                    {rider.vehicle_number ? (
+                      <NumberPlate number={rider.vehicle_number} style={{ marginLeft: spacing(1.25) }} />
+                    ) : null}
                     <Pressable
                       style={styles.callBtn}
                       onPress={() => Linking.openURL(`tel:${rider.rider_phone}`)}
@@ -295,20 +298,6 @@ export default function OrderDetailScreen() {
         </View>
       </ScrollView>
     </Screen>
-  );
-}
-
-// The rider's vehicle number on a Cream-Yolk (light) number plate — two screw
-// dots and bold Ink text, sized to its content so it sits inline by the role.
-function NumberPlate({ number }: { number: string }) {
-  return (
-    <View style={styles.plate}>
-      <View style={[styles.plateScrew, { left: 5 }]} />
-      <View style={[styles.plateScrew, { right: 5 }]} />
-      <Text style={styles.plateText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-        {number}
-      </Text>
-    </View>
   );
 }
 
@@ -460,24 +449,6 @@ const styles = StyleSheet.create({
   // for more space, lower it for less.
   callBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center", marginLeft: spacing(1) },
 
-  // Vehicle number plate — Cream Yolk light, compact, sized to its content; sits
-  // in the partner row right next to the name/role block.
-  // marginLeft = gap from "Delivery partner" (raise to nudge the plate right).
-  plate: {
-    marginLeft: spacing(1.25),
-    maxWidth: 130,
-    paddingTop: 4,
-    paddingBottom: 3,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: colors.heading,
-    backgroundColor: palette.yellow[100], // Cream Yolk, light shade
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  plateScrew: { position: "absolute", top: 3, width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: "rgba(37,61,78,0.35)" },
-  plateText: { fontFamily: fonts.bold, fontSize: 11, letterSpacing: 0.5, color: colors.heading, textAlign: "center" },
 
   celebrateWrap: { marginBottom: spacing(2) },
 

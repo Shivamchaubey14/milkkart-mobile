@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useUnreadCountQuery } from "../api/baseApi";
+import NotificationsScreen from "../screens/NotificationsScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
 import RiderHomeScreen from "../screens/RiderHomeScreen";
 import ProfileStack from "./ProfileStack";
@@ -14,6 +16,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
   Home: ["home-outline", "home"],
   Pending: ["time-outline", "time"],
+  Alerts: ["notifications-outline", "notifications"],
   Earnings: ["wallet-outline", "wallet"],
   Profile: ["person-outline", "person"],
 };
@@ -28,6 +31,8 @@ const EarningsTab = () => <PlaceholderScreen title="Earnings" icon="wallet-outli
 export default function RiderTabs() {
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, 8);
+  const { data: unread } = useUnreadCountQuery();
+  const unreadCount = unread?.unread_count ?? 0;
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -58,8 +63,21 @@ export default function RiderTabs() {
     >
       <Tab.Screen name="Home" component={RiderHomeScreen} />
       <Tab.Screen name="Pending" component={PendingTab} />
-      <Tab.Screen name="Profile" component={ProfileStack} />
+      <Tab.Screen
+        name="Alerts"
+        component={NotificationsScreen}
+        options={{
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.green,
+            color: colors.white,
+            fontFamily: fonts.bold,
+            fontSize: 10,
+          },
+        }}
+      />
       <Tab.Screen name="Earnings" component={EarningsTab} />
+      <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }
