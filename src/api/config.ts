@@ -43,12 +43,11 @@ function devApiBase(): string | null {
 
 export const API_BASE = devApiBase() ?? `${PROD_API_ORIGIN}/api/v1`;
 
-// Catalog/product images are served by the web storefront (milkkart-web on
-// :3000) in dev. In a standalone build there's no :3000, so images resolve
-// against the public origin (only present if the web app is also exposed).
-export const IMAGE_BASE = API_BASE.startsWith("http://")
-  ? API_BASE.replace(/:\d+\/.*$/, ":3000")
-  : PROD_API_ORIGIN;
+// Product images are uploaded to and served by the BACKEND (under /media/). The
+// API returns either an absolute URL (passed through by imageUrl) or a relative
+// /media/... path, which resolves against the backend origin below. So IMAGE_BASE
+// is simply the API origin without the /api/v1 suffix.
+export const IMAGE_BASE = API_BASE.replace(/\/api\/v1\/?$/, "");
 
 // Resolve a catalog image_url to a full URL the <Image> can load. Returns null
 // for empty paths; passes through absolute http(s)/data URLs unchanged.
