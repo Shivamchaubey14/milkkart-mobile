@@ -416,7 +416,7 @@ export const api = createApi({
       query: () => "/auth/me/",
       providesTags: ["Me"],
     }),
-    updateMe: build.mutation<User, { name?: string; email?: string }>({
+    updateMe: build.mutation<User, { name?: string; email?: string; avatar?: string }>({
       query: (body) => ({ url: "/auth/me/", method: "PATCH", body }),
       invalidatesTags: ["Me"],
     }),

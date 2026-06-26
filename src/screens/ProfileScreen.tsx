@@ -1,14 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { useWalletQuery } from "../api/baseApi";
+import { useUpdateMeMutation, useWalletQuery } from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { logout } from "../store/authSlice";
+import { logout, setUser } from "../store/authSlice";
 import { clearTokens } from "../store/secureTokens";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -87,9 +88,35 @@ export default function ProfileScreen() {
   const isRider = !!user?.is_rider;
   // Riders see stat rows, not the wallet/orders menu — skip the wallet fetch.
   const { data: wallet, isFetching, refetch } = useWalletQuery(undefined, { skip: isRider });
+  const [updateMe, { isLoading: uploadingAvatar }] = useUpdateMeMutation();
   const menu = isRider ? MENU.filter((m) => m.key === "profile") : MENU;
 
   const initial = (user?.name?.trim()?.[0] || "U").toUpperCase();
+
+  // Pick a photo from the library, compress to a data URL and save it as the
+  // profile picture (PATCH /auth/me/), then reflect it in the store.
+  async function pickAvatar() {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        toast("Photo access is needed to set a profile picture.", "info");
+        return;
+      }
+      const r = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.4,
+        base64: true,
+      });
+      if (r.canceled || !r.assets[0]?.base64) return;
+      const dataUrl = `data:image/jpeg;base64,${r.assets[0].base64}`;
+      const updated = await updateMe({ avatar: dataUrl }).unwrap();
+      dispatch(setUser(updated));
+      toast("Profile picture updated.");
+    } catch (e) {
+      toast("Couldn't update the picture. Please try again.", "error");
+    }
+  }
 
   async function onLogout() {
     await clearTokens();
@@ -112,9 +139,18 @@ export default function ProfileScreen() {
           <Text style={styles.headerTitle}>Profile</Text>
 
           <View style={styles.userRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
-            </View>
+            <Pressable style={styles.avatar} onPress={pickAvatar} disabled={uploadingAvatar}>
+              {uploadingAvatar ? (
+                <ActivityIndicator color={colors.white} />
+              ) : user?.avatar ? (
+                <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.avatarText}>{initial}</Text>
+              )}
+              <View style={styles.avatarBadge}>
+                <Ionicons name="camera" size={12} color={colors.white} />
+              </View>
+            </Pressable>
             <View style={styles.userInfo}>
               <Text style={styles.userName} numberOfLines={2}>
                 {user?.name || "MilkKart user"}
@@ -225,6 +261,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { fontFamily: fonts.bold, fontSize: 24, color: colors.white },
+  avatarImg: { width: 56, height: 56, borderRadius: 28 },
+  avatarBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.green,
+    borderWidth: 2,
+    borderColor: colors.heading,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   userInfo: { flex: 1, marginLeft: spacing(1.5) },
   userName: { fontFamily: fonts.bold, fontSize: 18, color: colors.white },
   userPhone: { fontFamily: fonts.semibold, fontSize: 14, color: colors.green, marginTop: 2 },

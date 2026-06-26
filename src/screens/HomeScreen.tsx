@@ -125,14 +125,19 @@ export default function HomeScreen() {
         {/* Dark header — deliver-to, avatar, search. */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <View>
+            <View style={styles.deliverCol}>
               <Text style={styles.deliverLabel}>DELIVER TO</Text>
-              <View style={styles.deliverRow}>
-                <AddressTicker labels={deliverLabels} style={styles.deliverValue} />
-              </View>
+              {/* Ticker on its own line so its changing width never nudges the
+                  tagline or the avatar. Tagline sits below and may wrap. */}
+              <AddressTicker labels={deliverLabels} style={styles.deliverValue} />
+              <Text style={styles.deliverTagline}>Blazing Fast Delivery in Minutes</Text>
             </View>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
+              {user?.avatar ? (
+                <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.avatarText}>{initial}</Text>
+              )}
             </View>
           </View>
 
@@ -294,9 +299,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing(2.5),
   },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  deliverCol: { flex: 1, marginRight: spacing(1.5) },
   deliverLabel: { fontFamily: fontsAlt.extrabold, fontSize: 10, letterSpacing: 1, color: colors.green },
-  deliverRow: { flexDirection: "row", alignItems: "center", marginTop: 3 },
-  deliverValue: { fontFamily: fonts.bold, fontSize: 16, color: colors.white, marginRight: 4 },
+  deliverValue: { fontFamily: fonts.bold, fontSize: 16, color: colors.white, marginTop: 3 },
+  deliverTagline: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.green, marginTop: 3, lineHeight: 15 },
   avatar: {
     width: 38,
     height: 38,
@@ -304,8 +310,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   avatarText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
+  avatarImg: { width: "100%", height: "100%" },
   searchWrap: { marginTop: spacing(2) },
 
   // Content ------------------------------------------------------------------
