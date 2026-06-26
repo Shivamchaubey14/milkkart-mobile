@@ -16,7 +16,11 @@
 // ───────────────────────────────────────────────────────────────────────────
 import Constants from "expo-constants";
 
-const FALLBACK_HOST = "192.168.71.160";
+// PUBLIC backend URL used by standalone/preview builds (an .apk), which can't
+// reach a LAN IP or auto-detect the Expo host. Point this at a tunnel/deploy of
+// the backend (currently an ngrok tunnel of :8000) and REBUILD if it changes.
+// In the Expo dev server this is ignored — the host is derived live instead.
+const PROD_API_ORIGIN = "https://b617-49-43-115-214.ngrok-free.app";
 
 // The "host:port" the phone used to load the JS bundle from the Expo packager.
 // Covers SDK 49+ (expoConfig.hostUri), Expo Go (manifest2), and classic manifest.
@@ -30,19 +34,21 @@ function expoHostUri(): string | undefined {
   );
 }
 
-// Strip the packager port and any scheme, leaving just the host/IP.
-function devHost(): string {
-  const uri = expoHostUri();
-  const host = uri?.split("://").pop()?.split(":")[0]?.trim();
-  return host && host.length > 0 ? host : FALLBACK_HOST;
+// Dev (Expo Go / dev server): the phone reached the packager on some host — use
+// that machine on :8000. Returns null when there's no packager (a standalone build).
+function devApiBase(): string | null {
+  const host = expoHostUri()?.split("://").pop()?.split(":")[0]?.trim();
+  return host && host.length > 0 ? `http://${host}:8000/api/v1` : null;
 }
 
-export const API_BASE = `http://${devHost()}:8000/api/v1`;
+export const API_BASE = devApiBase() ?? `${PROD_API_ORIGIN}/api/v1`;
 
 // Catalog/product images are served by the web storefront (milkkart-web on
-// :3000), not the backend, and `image_url` is a path relative to that origin.
-// Derive the web origin from API_BASE so there's only one IP to update.
-export const IMAGE_BASE = API_BASE.replace(/:\d+\/.*$/, ":3000");
+// :3000) in dev. In a standalone build there's no :3000, so images resolve
+// against the public origin (only present if the web app is also exposed).
+export const IMAGE_BASE = API_BASE.startsWith("http://")
+  ? API_BASE.replace(/:\d+\/.*$/, ":3000")
+  : PROD_API_ORIGIN;
 
 // Resolve a catalog image_url to a full URL the <Image> can load. Returns null
 // for empty paths; passes through absolute http(s)/data URLs unchanged.

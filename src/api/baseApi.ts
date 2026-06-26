@@ -362,6 +362,9 @@ const rawBaseQuery = fetchBaseQuery({
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.access;
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    // When the backend is reached through an ngrok tunnel, skip its browser
+    // interstitial so API responses come back as JSON, not an HTML warning page.
+    headers.set("ngrok-skip-browser-warning", "1");
     return headers;
   },
 });
