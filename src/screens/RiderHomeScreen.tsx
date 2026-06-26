@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -19,6 +19,7 @@ import { NumberPlate } from "../components/NumberPlate";
 import { OrderItemsModal } from "../components/OrderItemsModal";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import { presentLocalAlert } from "../notifications/push";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -51,7 +52,35 @@ export default function RiderHomeScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [itemsFor, setItemsFor] = useState<RiderDelivery | null>(null);
   const [deliverFor, setDeliverFor] = useState<RiderDelivery | null>(null);
-  const { data: day, isFetching, refetch } = useRiderDayQuery(dateISO(date));
+  // Poll so a freshly-assigned order surfaces (and alerts) within ~20s without
+  // the rider pulling to refresh.
+  const { data: day, isFetching, refetch } = useRiderDayQuery(dateISO(date), {
+    pollingInterval: 20000,
+  });
+
+  // In-app alert path: when a brand-new "assigned" order appears, fire a local
+  // notification + buzz so the rider is alerted even without remote push (works
+  // in Expo Go). Seed the seen-set on first load so existing orders don't alert.
+  const seenAssignedRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const assigned = (day?.deliveries ?? []).filter((d) => d.status === "assigned");
+    if (seenAssignedRef.current === null) {
+      seenAssignedRef.current = new Set(assigned.map((d) => d.order_number));
+      return;
+    }
+    const seen = seenAssignedRef.current;
+    const fresh = assigned.filter((d) => !seen.has(d.order_number));
+    fresh.forEach((d) => seen.add(d.order_number));
+    if (fresh.length > 0) {
+      const d = fresh[0];
+      const more = fresh.length > 1 ? ` (+${fresh.length - 1} more)` : "";
+      presentLocalAlert(
+        "New delivery assigned 🛵",
+        `Order #${d.order_number.slice(0, 8)}${d.address ? " — " + d.address : ""}${more}`,
+        { type: "new_assignment", order_number: d.order_number },
+      );
+    }
+  }, [day]);
 
   // Local mirror of duty so the toggle animates immediately, then syncs.
   const [onDuty, setOnDuty] = useState(true);
@@ -342,7 +371,9 @@ function StatCard({
     <View style={[styles.statCard, { backgroundColor: bg }]}>
       <View style={styles.statTop}>
         <Ionicons name={icon} size={17} color={fg} />
-        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          {value}
+        </Text>
         {/* Spacer mirrors the icon width so the value stays centered in the card. */}
         <View style={styles.statSpacer} />
       </View>

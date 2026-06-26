@@ -753,6 +753,10 @@ export const api = createApi({
         }
       },
     }),
+    // Register this device's Expo push token so the backend can push to it.
+    registerDevice: build.mutation<unknown, { token: string; platform: string }>({
+      query: (body) => ({ url: "/notifications/devices/", method: "POST", body }),
+    }),
   }),
 });
 
@@ -815,4 +819,5 @@ export const {
   useMarkAllNotificationsReadMutation,
   useNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
+  useRegisterDeviceMutation,
 } = api;
