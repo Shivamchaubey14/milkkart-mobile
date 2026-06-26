@@ -123,7 +123,12 @@ export default function CheckoutScreen() {
       }).unwrap();
       await initiatePayment({ order_number: order.order_number, method: pm.backend }).unwrap();
       toast("Order placed successfully!");
-      navigation.goBack();
+      // Land the customer straight on the live order-details page (Profile tab).
+      // Checkout (a root-stack screen) pops as we navigate back down to Main.
+      navigation.navigate("Main", {
+        screen: "Profile",
+        params: { screen: "OrderDetail", params: { orderNumber: order.order_number } },
+      } as never);
     } catch (e: any) {
       toast(e?.data?.error || "Couldn't place the order. Please try again.", "error");
     }

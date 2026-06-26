@@ -18,6 +18,7 @@ import { OrderSummary, useOrdersQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import { useInvoiceDownloader } from "../invoices/useInvoiceDownloader";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -56,7 +57,11 @@ function fmtDate(iso: string) {
 
 export default function OrdersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { data: orders, isLoading, isFetching, refetch } = useOrdersQuery();
+  // Poll so order statuses on the list refresh on their own (e.g. an order
+  // flipping to Out-for-delivery / Delivered) without a manual pull.
+  const { data: orders, isLoading, isFetching, refetch } = useOrdersQuery(undefined, {
+    pollingInterval: 5000,
+  });
   const [filter, setFilter] = useState("all");
 
   const sorted = [...(orders ?? [])].sort(
@@ -145,6 +150,7 @@ function OrderCard({
   onTrack: () => void;
 }) {
   const toast = useToast();
+  const { download, busy: invoiceBusy } = useInvoiceDownloader();
   const scale = useRef(new Animated.Value(1)).current;
   const s = statusOf(order.status);
   const soon = (what: string) => () => toast(`${what} — coming soon.`);
@@ -209,10 +215,26 @@ function OrderCard({
             <ActionBtn label="Help" variant="soft" onPress={soon("Help")} />
           </View>
         ) : order.status === "delivered" ? (
-          <View style={styles.actions}>
-            <ActionBtn label="Reorder" variant="solid" onPress={soon("Reorder")} />
-            <ActionBtn label="Rate" variant="soft" onPress={soon("Rate")} />
-          </View>
+          <>
+            <View style={styles.actions}>
+              <ActionBtn label="Reorder" variant="solid" onPress={soon("Reorder")} />
+              <ActionBtn label="Rate" variant="soft" onPress={soon("Rate")} />
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.invoiceBtn, pressed && { opacity: 0.7 }]}
+              onPress={() => download(order.order_number)}
+              disabled={invoiceBusy}
+            >
+              {invoiceBusy ? (
+                <ActivityIndicator size="small" color="#b98421" />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={16} color="#b98421" />
+                  <Text style={styles.invoiceText}>Download invoice</Text>
+                </>
+              )}
+            </Pressable>
+          </>
         ) : null}
       </Pressable>
     </Animated.View>
@@ -339,6 +361,8 @@ const styles = StyleSheet.create({
   refunded: { fontFamily: fonts.bold, fontSize: 13, color: colors.green, marginLeft: spacing(1) },
 
   actions: { flexDirection: "row", gap: spacing(1.25), marginTop: spacing(1.75) },
+  invoiceBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, height: 44, borderRadius: 12, backgroundColor: colors.yellowTint, marginTop: spacing(1.25) },
+  invoiceText: { fontFamily: fonts.bold, fontSize: 14, color: "#b98421" },
   actionBtn: { flex: 1, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   actionOutline: { borderWidth: 1.5, borderColor: colors.green, backgroundColor: colors.bg },
   actionSoft: { backgroundColor: colors.bgSoft },

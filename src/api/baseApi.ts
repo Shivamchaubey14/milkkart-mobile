@@ -186,6 +186,24 @@ export type OrderDetail = {
   updated_at: string;
 };
 
+export type Invoice = {
+  id: number;
+  number: string;
+  order_number: string;
+  order_status: string;
+  subtotal: string;
+  discount: string;
+  delivery_fee: string;
+  small_cart_fee: string;
+  tax: string;
+  total: string;
+  address_snapshot: string;
+  items: OrderItemDetail[];
+  placed_at: string;
+  issued_at: string;
+  emailed_at: string | null;
+};
+
 export type OrderReview = {
   id: number;
   order_rating: number;
@@ -607,6 +625,9 @@ export const api = createApi({
     orderDetail: build.query<OrderDetail, string>({
       query: (orderNumber) => `/orders/${orderNumber}/`,
     }),
+    invoiceForOrder: build.query<Invoice, string>({
+      query: (orderNumber) => `/invoices/${orderNumber}/`,
+    }),
     initiatePayment: build.mutation<unknown, { order_number: string; method: string }>({
       query: (body) => ({ url: "/payments/initiate/", method: "POST", body }),
     }),
@@ -796,6 +817,7 @@ export const {
   useCheckoutMutation,
   useOrdersQuery,
   useOrderDetailQuery,
+  useLazyInvoiceForOrderQuery,
   useInitiatePaymentMutation,
   useWalletQuery,
   useWalletTopupMutation,
