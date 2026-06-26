@@ -162,6 +162,8 @@ export type OrderAssignment = {
   delivery_otp: string;
   rider_lat: string | null;
   rider_lng: string | null;
+  /** Actual handover time (ISO), set when the rider completes delivery. */
+  delivered_at: string | null;
 };
 
 export type OrderDetail = {

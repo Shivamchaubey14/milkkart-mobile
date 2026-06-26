@@ -133,7 +133,7 @@ export default function TrackOrderScreen() {
           <DeliveredCelebration
             orderNumber={order.order_number}
             total={order.total}
-            deliveredAt={order.updated_at}
+            deliveredAt={order.assignment?.delivered_at ?? order.updated_at}
             riderName={rider?.rider_name}
             onReorder={() => toast("Reorder — coming soon.", "info")}
           />

@@ -131,7 +131,7 @@ export default function OrderDetailScreen() {
                   <DeliveredCelebration
                     orderNumber={order.order_number}
                     total={order.total}
-                    deliveredAt={order.updated_at}
+                    deliveredAt={order.assignment?.delivered_at ?? order.updated_at}
                     riderName={rider?.rider_name}
                     onReorder={() => toast("Reorder — coming soon.")}
                   />
@@ -155,7 +155,7 @@ export default function OrderDetailScreen() {
               <View style={styles.card}>
                 <View style={styles.timelineHead}>
                   <Text style={styles.arriving}>
-                    {returned ? "Returned" : order.status === "delivered" ? "Delivered" : "Arriving soon"}
+                    {returned || order.status === "delivered" ? "Order Journey" : "Arriving soon"}
                   </Text>
                   {tracking ? <Text style={styles.liveTrack}>Live track</Text> : null}
                 </View>
@@ -164,6 +164,9 @@ export default function OrderDetailScreen() {
                     const done = i < step;
                     const active = i === step;
                     const isReturnStep = returned && i === STEPS.length - 1;
+                    // The final "Delivered" step is the active step once delivered;
+                    // show a checkmark on it (not the pending dot) to mark completion.
+                    const isDeliveredStep = order.status === "delivered" && active && i === STEPS.length - 1;
                     return (
                       <View key={i} style={styles.timelineStep}>
                         <View style={styles.timelineLineWrap}>
@@ -178,7 +181,7 @@ export default function OrderDetailScreen() {
                           >
                             {isReturnStep && active ? (
                               <Ionicons name="arrow-undo" size={12} color={colors.white} />
-                            ) : done ? (
+                            ) : done || isDeliveredStep ? (
                               <Ionicons name="checkmark" size={13} color={colors.white} />
                             ) : (
                               <View style={[styles.nodeInner, active && styles.nodeInnerActive]} />
