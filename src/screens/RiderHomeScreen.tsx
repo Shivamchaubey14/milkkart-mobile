@@ -18,8 +18,10 @@ import { DutyToggle } from "../components/DutyToggle";
 import { LanguagePicker } from "../components/LanguagePicker";
 import { NumberPlate } from "../components/NumberPlate";
 import { OrderItemsModal } from "../components/OrderItemsModal";
+import { PaymentSlipModal } from "../components/PaymentSlipModal";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import { UpiQrModal } from "../components/UpiQrModal";
 import { useT } from "../i18n/LanguageProvider";
 import type { TKey } from "../i18n/translations";
 import { presentLocalAlert } from "../notifications/push";
@@ -56,6 +58,8 @@ export default function RiderHomeScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [itemsFor, setItemsFor] = useState<RiderDelivery | null>(null);
   const [deliverFor, setDeliverFor] = useState<RiderDelivery | null>(null);
+  const [upiFor, setUpiFor] = useState<RiderDelivery | null>(null);
+  const [slipFor, setSlipFor] = useState<RiderDelivery | null>(null);
   // Poll so a freshly-assigned order surfaces (and alerts) within ~20s without
   // the rider pulling to refresh.
   const { data: day, isFetching, refetch } = useRiderDayQuery(dateISO(date), {
@@ -262,6 +266,13 @@ export default function RiderHomeScreen() {
               <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginTop: 1 }} />
               <Text style={styles.fullAddress}>{current.address}</Text>
             </View>
+            {/* COD orders can be paid by UPI — show a QR for the order amount. */}
+            {current.is_cod ? (
+              <Pressable style={({ pressed }) => [styles.upiBtn, pressed && { opacity: 0.85 }]} onPress={() => setUpiFor(current)}>
+                <Ionicons name="qr-code-outline" size={16} color={colors.green} />
+                <Text style={styles.upiBtnText}>{t("collectViaUpi")}</Text>
+              </Pressable>
+            ) : null}
             <View style={styles.actionRow}>
               <Pressable style={styles.navigateBtn} onPress={soon()}>
                 <Ionicons name="navigate-outline" size={16} color={colors.green} />
@@ -300,6 +311,27 @@ export default function RiderHomeScreen() {
 
       <OrderItemsModal delivery={itemsFor} onClose={() => setItemsFor(null)} />
       <DeliverModal delivery={deliverFor} onClose={() => setDeliverFor(null)} />
+      <UpiQrModal
+        delivery={upiFor}
+        onClose={() => setUpiFor(null)}
+        onPaid={() => {
+          const d = upiFor;
+          setUpiFor(null);
+          // Generate the payment slip once the rider confirms payment. Stagger
+          // so the QR sheet finishes dismissing first (avoids overlapping modals).
+          if (d) setTimeout(() => setSlipFor(d), 280);
+        }}
+      />
+      <PaymentSlipModal
+        delivery={slipFor}
+        onClose={() => setSlipFor(null)}
+        onContinue={() => {
+          const d = slipFor;
+          setSlipFor(null);
+          // Continue to the OTP / confirm-delivery sheet after the slip.
+          if (d) setTimeout(() => setDeliverFor(d), 280);
+        }}
+      />
     </Screen>
   );
 }
@@ -475,6 +507,8 @@ const styles = StyleSheet.create({
   deliveryName: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
   deliveryAddr: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   deliveryAmount: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading, marginLeft: spacing(1) },
+  upiBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, height: 44, borderRadius: 12, backgroundColor: colors.greenTint, marginTop: spacing(1.25) },
+  upiBtnText: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), marginTop: spacing(1.75) },
   navigateBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 44, borderRadius: 12, borderWidth: 1.5, borderColor: colors.green },
   navigateText: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
