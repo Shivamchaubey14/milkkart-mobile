@@ -216,6 +216,10 @@ export default function RiderHomeScreen() {
         <View style={styles.statRow}>
           <StatCard icon="checkmark-done" bg={colors.greenTint} fg={colors.green} value={String(stats?.delivered ?? 0)} label={t("delivered")} />
           <StatCard icon="time-outline" bg={colors.yellowTint} fg="#b98421" value={String(stats?.pending ?? 0)} label={t("pending")} />
+          {/* Returned tile only when there is something returned (like the web). */}
+          {(stats?.returned ?? 0) > 0 ? (
+            <StatCard icon="arrow-undo-outline" bg="#fdecd9" fg="#b46b00" value={String(stats?.returned ?? 0)} label={t("returned")} />
+          ) : null}
           <StatCard icon="cash-outline" bg={colors.greenTint} fg={colors.green} value={money(stats?.earnings ?? 0)} label={t("earnings")} />
         </View>
 
@@ -409,15 +413,13 @@ function StatCard({
 }) {
   return (
     <View style={[styles.statCard, { backgroundColor: bg }]}>
-      <View style={styles.statTop}>
-        {/* Icon is absolutely pinned to the left so the value can use the full
-            card width and stays centered — same fixed size across all cards. */}
-        <Ionicons name={icon} size={17} color={fg} style={styles.statIcon} />
-        <Text style={styles.statValue} numberOfLines={1}>
-          {value}
-        </Text>
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
+      {/* Icon, value and label stacked vertically (centered) so the value never
+          overlaps the icon — even for wide values like earnings. */}
+      <Ionicons name={icon} size={18} color={fg} />
+      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {value}
+      </Text>
+      <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
     </View>
   );
 }
@@ -465,11 +467,9 @@ const styles = StyleSheet.create({
 
   // Stat cards
   statRow: { flexDirection: "row", gap: spacing(1.25) },
-  statCard: { flex: 1, borderRadius: 16, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.25), alignItems: "center" },
-  statTop: { width: "100%", minHeight: 22, alignItems: "center", justifyContent: "center", position: "relative" },
-  statIcon: { position: "absolute", left: 0, top: "50%", marginTop: -8.5 },
-  statValue: { textAlign: "center", fontFamily: fonts.bold, fontSize: 12, color: colors.heading },
-  statLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 5, textAlign: "center" },
+  statCard: { flex: 1, borderRadius: 16, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1), alignItems: "center" },
+  statValue: { textAlign: "center", fontFamily: fonts.bold, fontSize: 16, color: colors.heading, marginTop: 6 },
+  statLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 4, textAlign: "center" },
 
   // Cash-on-delivery card
   codCard: { backgroundColor: colors.heading, borderRadius: 18, padding: spacing(2), marginTop: spacing(2.5), overflow: "hidden" },
