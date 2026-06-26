@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 
+import { useAppSelector } from "../store/hooks";
 import { Lang, STRINGS, TKey } from "./translations";
 
 // Persisted with expo-secure-store (same store used for auth tokens / wishlist),
@@ -18,6 +19,10 @@ const LanguageContext = createContext<Ctx | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("en");
+  // The language switch is a RIDER-only feature. Customers always see English,
+  // even though the stored preference is device-wide (a rider may have set Hindi
+  // on a shared screen like Notifications).
+  const isRider = useAppSelector((s) => !!s.auth.user?.is_rider);
 
   useEffect(() => {
     SecureStore.getItemAsync(KEY)
@@ -36,16 +41,19 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Effective language: only riders get the chosen language; everyone else "en".
+  const effLang: Lang = isRider ? lang : "en";
+
   const t = useCallback(
     (key: TKey, vars?: Vars) => {
-      const table = STRINGS[lang] as Record<string, string>;
+      const table = STRINGS[effLang] as Record<string, string>;
       let s = table[key] ?? (STRINGS.en as Record<string, string>)[key] ?? key;
       if (vars) {
         for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
       }
       return s;
     },
-    [lang],
+    [effLang],
   );
 
   const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);

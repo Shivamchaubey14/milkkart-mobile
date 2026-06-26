@@ -5,7 +5,6 @@ import {
   Animated,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -41,7 +40,9 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
   const [data, setData] = useState<RiderDelivery | null>(delivery);
   const translateY = useRef(new Animated.Value(800)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
-  const keyboard = useRef(new Animated.Value(0)).current;
+  // Keyboard height (minus the safe-area inset) used as scroll padding so the
+  // form can be scrolled clear of the keyboard — the sheet itself stays put.
+  const [kbHeight, setKbHeight] = useState(0);
   const codeRef = useRef<TextInput>(null);
   const [mounted, setMounted] = useState(visible);
 
@@ -58,16 +59,15 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
     const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
     const onShow = (e: { endCoordinates: { height: number } }) =>
-      Animated.timing(keyboard, { toValue: Math.max(0, e.endCoordinates.height - insets.bottom), duration: 220, useNativeDriver: true }).start();
-    const onHide = () => Animated.timing(keyboard, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      setKbHeight(Math.max(0, e.endCoordinates.height - insets.bottom));
+    const onHide = () => setKbHeight(0);
     const s = Keyboard.addListener(showEvt, onShow);
     const h = Keyboard.addListener(hideEvt, onHide);
     return () => {
       s.remove();
       h.remove();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [insets.bottom]);
 
   useEffect(() => {
     if (visible) {
@@ -143,9 +143,9 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <KeyboardAvoidingView style={styles.kav} behavior={Platform.OS === "ios" ? "padding" : undefined} pointerEvents="box-none">
+      <View style={styles.kav} pointerEvents="box-none">
         <Animated.View
-          style={[styles.sheet, { transform: [{ translateY: Animated.subtract(translateY, keyboard) }], paddingBottom: insets.bottom + spacing(2) }]}
+          style={[styles.sheet, { transform: [{ translateY }], paddingBottom: insets.bottom + spacing(2) }]}
         >
           <View style={styles.handle} />
           <View style={styles.head}>
@@ -158,7 +158,12 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
             </Pressable>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={{ paddingBottom: kbHeight }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.label}>{t("deliveryOtp")}</Text>
             {/* Six segmented "cube" boxes backed by one hidden input (matches login). */}
             <Pressable style={styles.otpRow} onPress={() => codeRef.current?.focus()}>
@@ -256,7 +261,7 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
             ) : null}
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
