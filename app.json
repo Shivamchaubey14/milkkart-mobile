@@ -24,7 +24,14 @@
     "plugins": [
       "expo-secure-store",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "MilkKart uses the camera so riders can attach a delivery proof photo.",
+          "photosPermission": "MilkKart accesses your photos so riders can attach a delivery proof photo."
+        }
+      ]
     ]
   }
 }
