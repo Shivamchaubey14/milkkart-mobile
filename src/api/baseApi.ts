@@ -234,6 +234,8 @@ export type RiderDeliveryItem = {
 export type RiderDelivery = {
   order_number: string;
   address: string;
+  dest_lat: string | null;
+  dest_lng: string | null;
   total: string;
   status: string;
   type: "instant" | "subscription";

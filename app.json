@@ -25,6 +25,12 @@
       "expo-secure-store",
       "expo-font",
       "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MilkKart uses your location to navigate to delivery addresses."
+        }
+      ],
       "@react-native-community/datetimepicker",
       [
         "expo-image-picker",

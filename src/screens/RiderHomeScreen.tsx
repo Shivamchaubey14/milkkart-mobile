@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -24,6 +26,7 @@ import { useToast } from "../components/Toast";
 import { UpiQrModal } from "../components/UpiQrModal";
 import { useT } from "../i18n/LanguageProvider";
 import type { TKey } from "../i18n/translations";
+import type { RiderHomeStackParamList } from "../navigation/RiderHomeStack";
 import { presentLocalAlert } from "../notifications/push";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -48,6 +51,7 @@ const STATUS_LABEL_KEY: Record<string, TKey> = {
 export default function RiderHomeScreen() {
   const toast = useToast();
   const t = useT();
+  const navigation = useNavigation<NativeStackNavigationProp<RiderHomeStackParamList>>();
   const { data: me } = useMeQuery();
   const { data: duty } = useRiderDutyQuery();
   const [setRiderDuty] = useSetRiderDutyMutation();
@@ -278,7 +282,17 @@ export default function RiderHomeScreen() {
               </Pressable>
             ) : null}
             <View style={styles.actionRow}>
-              <Pressable style={styles.navigateBtn} onPress={soon()}>
+              <Pressable
+                style={styles.navigateBtn}
+                onPress={() =>
+                  navigation.navigate("RiderNavigate", {
+                    orderNumber: current.order_number,
+                    address: current.address,
+                    destLat: current.dest_lat,
+                    destLng: current.dest_lng,
+                  })
+                }
+              >
                 <Ionicons name="navigate-outline" size={16} color={colors.green} />
                 <Text style={styles.navigateText}>{t("navigate")}</Text>
               </Pressable>
