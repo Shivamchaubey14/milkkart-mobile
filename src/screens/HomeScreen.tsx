@@ -6,7 +6,6 @@ import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleS
 
 import {
   CatalogProduct,
-  useAddressesQuery,
   useAddToCartMutation,
   useBannersQuery,
   useCartQuery,
@@ -16,7 +15,6 @@ import {
   useUpdateCartItemMutation,
 } from "../api/baseApi";
 import { imageUrl } from "../api/config";
-import { AddressTicker } from "../components/AddressTicker";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
@@ -38,13 +36,6 @@ export default function HomeScreen() {
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners, refetch: refetchBanners } = useBannersQuery();
   const { data: categories, refetch: refetchCategories } = useCategoriesQuery();
-
-  // Saved-address labels (default first) for the "Deliver to" ticker.
-  const { data: addresses } = useAddressesQuery();
-  const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : "Address");
-  const deliverLabels = [...(addresses ?? [])]
-    .sort((a, b) => Number(b.is_default) - Number(a.is_default))
-    .map((a) => cap(a.label));
 
   // null = "All"; otherwise a category id used to filter the product query.
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
@@ -122,15 +113,13 @@ export default function HomeScreen() {
           <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
         }
       >
-        {/* Dark header — deliver-to, avatar, search. */}
+        {/* Dark header — brand logo, avatar, search. */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <View style={styles.deliverCol}>
-              <Text style={styles.deliverLabel}>DELIVER TO</Text>
-              {/* Ticker on its own line so its changing width never nudges the
-                  tagline or the avatar. Tagline sits below and may wrap. */}
-              <AddressTicker labels={deliverLabels} style={styles.deliverValue} />
-              <Text style={styles.deliverTagline}>Blazing Fast Delivery in Minutes</Text>
+            {/* Brand logo on a light chip so the dark wordmark stays visible on
+                the dark header. */}
+            <View style={styles.logoChip}>
+              <Image source={require("../assets/milkkart-logo.png")} style={styles.logo} resizeMode="contain" />
             </View>
             <View style={styles.avatar}>
               {user?.avatar ? (
@@ -299,10 +288,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing(2.5),
   },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  deliverCol: { flex: 1, marginRight: spacing(1.5) },
-  deliverLabel: { fontFamily: fontsAlt.extrabold, fontSize: 10, letterSpacing: 1, color: colors.green },
-  deliverValue: { fontFamily: fonts.bold, fontSize: 16, color: colors.white, marginTop: 3 },
-  deliverTagline: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.green, marginTop: 3, lineHeight: 15 },
+  logoChip: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    paddingHorizontal: spacing(1.25),
+    paddingVertical: spacing(0.75),
+  },
+  logo: { width: 88, height: 34 },
   avatar: {
     width: 38,
     height: 38,
