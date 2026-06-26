@@ -223,7 +223,7 @@ export default function AccountScreen() {
               <View key={a.id} style={styles.addrCard}>
                 <View style={styles.addrTop}>
                   <View style={styles.addrIcon}>
-                    <Ionicons name={labelIcon(a.label)} size={18} color={colors.green} />
+                    <Ionicons name={labelIcon(a.label)} size={18} color={colors.heading} />
                   </View>
                   <Text style={styles.addrLabel}>
                     {a.label ? a.label[0].toUpperCase() + a.label.slice(1) : "Address"}
@@ -246,7 +246,7 @@ export default function AccountScreen() {
                     <Text style={styles.actionGreen}>Edit</Text>
                   </Pressable>
                   <Pressable style={styles.deletePill} hitSlop={6} onPress={() => confirmDelete(a)}>
-                    <Ionicons name="trash-outline" size={15} color={colors.error} />
+                    <Ionicons name="trash-outline" size={15} color={colors.white} />
                     <Text style={styles.actionRed}>Delete</Text>
                   </Pressable>
                 </View>
@@ -394,10 +394,14 @@ const styles = StyleSheet.create({
   },
   verifiedText: { fontFamily: fonts.bold, fontSize: 11, color: colors.green },
 
-  // Address — matches the Bill Details card (neutral surface).
+  // Address — neutral surface (like Bill Details) with a hairline border like
+  // the Personal Details card. Uses `line` (not lineSoft) so the border stays
+  // visible against the grey bgSoft fill.
   addrCard: {
     backgroundColor: colors.bgSoft,
     borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
     padding: spacing(1.75),
     marginTop: spacing(1.5),
   },
@@ -406,7 +410,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: colors.white,
+    backgroundColor: colors.yellow,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -442,13 +446,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: colors.errorTint,
+    backgroundColor: colors.error,
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 14,
   },
   actionGreen: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
-  actionRed: { fontFamily: fonts.bold, fontSize: 14, color: colors.error },
+  actionRed: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
 
   // Add address
   addBtn: {
