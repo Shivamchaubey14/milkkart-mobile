@@ -25,7 +25,7 @@ import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { setUser } from "../store/authSlice";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
+import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -394,10 +394,10 @@ const styles = StyleSheet.create({
   },
   verifiedText: { fontFamily: fonts.bold, fontSize: 11, color: colors.green },
 
-  // Address — Cream Yolk 400 card.
+  // Address — matches the Bill Details card (neutral surface).
   addrCard: {
-    backgroundColor: palette.yellow[300],
-    borderRadius: 16,
+    backgroundColor: colors.bgSoft,
+    borderRadius: 14,
     padding: spacing(1.75),
     marginTop: spacing(1.5),
   },
