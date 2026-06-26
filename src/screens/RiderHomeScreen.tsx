@@ -22,6 +22,7 @@ import { NumberPlate } from "../components/NumberPlate";
 import { OrderItemsModal } from "../components/OrderItemsModal";
 import { PaymentSlipModal } from "../components/PaymentSlipModal";
 import { Screen } from "../components/Screen";
+import { StatusDot } from "../components/StatusDot";
 import { useToast } from "../components/Toast";
 import { UpiQrModal } from "../components/UpiQrModal";
 import { useT } from "../i18n/LanguageProvider";
@@ -160,7 +161,11 @@ export default function RiderHomeScreen() {
           <View style={styles.riderTop}>
             <View style={styles.avatarCol}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initial}</Text>
+                {me?.avatar ? (
+                  <Image source={{ uri: me.avatar }} style={styles.avatarImg} />
+                ) : (
+                  <Text style={styles.avatarText}>{initial}</Text>
+                )}
               </View>
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={12} color={colors.yellow} />
@@ -188,13 +193,14 @@ export default function RiderHomeScreen() {
 
           <View style={styles.dutyRow}>
             <View style={styles.dutyTextWrap}>
-              <View style={styles.dutyLabelRow}>
-                <View style={[styles.statusDot, { backgroundColor: onDuty ? colors.green : "rgba(255,255,255,0.4)" }]} />
+              {/* Status dot — glows + blinks while on duty, static when off. */}
+              <StatusDot active={onDuty} color={onDuty ? colors.green : "rgba(255,255,255,0.4)"} />
+              <View style={styles.dutyTextCol}>
                 <Text style={styles.dutyLabel}>{onDuty ? t("onDuty") : t("offDuty")}</Text>
+                <Text style={styles.dutyHint}>
+                  {onDuty ? t("acceptingDeliveries") : t("notAcceptingDeliveries")}
+                </Text>
               </View>
-              <Text style={styles.dutyHint}>
-                {onDuty ? t("acceptingDeliveries") : t("notAcceptingDeliveries")}
-              </Text>
             </View>
             <DutyToggle value={onDuty} onChange={toggleDuty} />
           </View>
@@ -446,8 +452,9 @@ const styles = StyleSheet.create({
   blob: { position: "absolute", top: -40, right: -28, width: 130, height: 130, borderRadius: 65, backgroundColor: "rgba(255,255,255,0.05)" },
   riderTop: { flexDirection: "row", alignItems: "flex-start" },
   avatarCol: { alignItems: "center" },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.green, alignItems: "center", justifyContent: "center" },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarText: { fontFamily: fonts.bold, fontSize: 20, color: colors.white },
+  avatarImg: { width: "100%", height: "100%" },
   ratingRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 6 },
   ratingText: { fontFamily: fonts.bold, fontSize: 13, color: colors.yellow },
   riderInfo: { flex: 1, marginLeft: spacing(1.5), paddingTop: 2 },
@@ -465,11 +472,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.25),
     paddingHorizontal: spacing(1.75),
   },
-  dutyTextWrap: { flex: 1 },
-  dutyLabelRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  dutyTextWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 9 },
+  dutyTextCol: { flex: 1 },
   dutyLabel: { fontFamily: fonts.bold, fontSize: 15, color: colors.white },
-  dutyHint: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2, marginLeft: 15 },
+  dutyHint: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2 },
 
   // Section headers
   sectionHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: spacing(2.75), marginBottom: spacing(1.25) },
