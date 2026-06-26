@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -59,10 +59,20 @@ export default function OrdersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   // Poll so order statuses on the list refresh on their own (e.g. an order
   // flipping to Out-for-delivery / Delivered) without a manual pull.
-  const { data: orders, isLoading, isFetching, refetch } = useOrdersQuery(undefined, {
+  const { data: orders, isLoading, refetch } = useOrdersQuery(undefined, {
     pollingInterval: 5000,
   });
   const [filter, setFilter] = useState("all");
+  // Polling refreshes the list silently; the spinner shows only on a user pull.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const sorted = [...(orders ?? [])].sort(
     (a, b) => new Date(b.placed_at).getTime() - new Date(a.placed_at).getTime(),
@@ -119,7 +129,7 @@ export default function OrdersScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.list}
             refreshControl={
-              <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
             }
           >
             {visible.map((o, i) => (

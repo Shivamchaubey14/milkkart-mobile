@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { OrderItemDetail, useOrderDetailQuery } from "../api/baseApi";
@@ -61,12 +61,23 @@ export default function OrderDetailScreen() {
   // their own (e.g. the moment the rider picks up → "On the way" + map appears),
   // no pull-to-refresh needed. Stops once the order reaches a terminal state.
   const [live, setLive] = useState(true);
-  const { data: order, isLoading, isFetching, refetch } = useOrderDetailQuery(orderNumber, {
+  const { data: order, isLoading, refetch } = useOrderDetailQuery(orderNumber, {
     pollingInterval: live ? 3000 : 0,
   });
   useEffect(() => {
     if (order) setLive(!["delivered", "cancelled", "returned"].includes(order.status));
   }, [order?.status]);
+  // Background polling updates silently; only spin the pull-to-refresh control
+  // for an explicit user pull (not on every poll).
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
   const [eta, setEta] = useState("");
 
   if (isLoading || !order) {
@@ -113,7 +124,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
         }
       >
         {/* Header */}
