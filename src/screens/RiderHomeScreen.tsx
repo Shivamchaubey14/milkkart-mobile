@@ -187,7 +187,7 @@ export default function RiderHomeScreen() {
               <Text style={styles.codColLabel}>To collect</Text>
               <Text style={styles.codAmount}>{money(stats?.cod_to_collect ?? 0)}</Text>
             </View>
-            <View style={styles.codCol}>
+            <View style={[styles.codCol, styles.codColRight]}>
               <Text style={styles.codColLabel}>Collected</Text>
               <Text style={[styles.codAmount, { color: colors.white }]}>{money(stats?.cod_collected ?? 0)}</Text>
             </View>
@@ -343,6 +343,8 @@ function StatCard({
       <View style={styles.statTop}>
         <Ionicons name={icon} size={17} color={fg} />
         <Text style={styles.statValue}>{value}</Text>
+        {/* Spacer mirrors the icon width so the value stays centered in the card. */}
+        <View style={styles.statSpacer} />
       </View>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -392,16 +394,20 @@ const styles = StyleSheet.create({
 
   // Stat cards
   statRow: { flexDirection: "row", gap: spacing(1.25) },
-  statCard: { flex: 1, borderRadius: 16, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.25) },
-  statTop: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statValue: { fontFamily: fonts.bold, fontSize: 17, color: colors.heading },
-  statLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 5 },
+  statCard: { flex: 1, borderRadius: 16, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.25), alignItems: "center" },
+  statTop: { flexDirection: "row", alignItems: "center", width: "100%", gap: 6 },
+  statSpacer: { width: 17 },
+  statValue: { flex: 1, textAlign: "center", fontFamily: fonts.bold, fontSize: 17, color: colors.heading },
+  statLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 5, textAlign: "center" },
 
   // Cash-on-delivery card
   codCard: { backgroundColor: colors.heading, borderRadius: 18, padding: spacing(2), marginTop: spacing(2.5), overflow: "hidden" },
   codLabel: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 1, color: "rgba(255,255,255,0.55)" },
   codRow: { flexDirection: "row", marginTop: spacing(1.5) },
   codCol: { flex: 1 },
+  // Right column aligns its label + amount to the card's right edge so
+  // "Collected" mirrors "To collect" on the left.
+  codColRight: { alignItems: "flex-end" },
   codColLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)" },
   codAmount: { fontFamily: fonts.bold, fontSize: 22, color: colors.yellow, marginTop: 3 },
   settleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: 12, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.75), marginTop: spacing(2) },
