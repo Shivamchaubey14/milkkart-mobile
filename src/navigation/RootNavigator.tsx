@@ -2,6 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { useMeQuery } from "../api/baseApi";
+import PushRegistrar from "../notifications/PushRegistrar";
 import CheckoutScreen from "../screens/CheckoutScreen";
 import LoginScreen from "../screens/auth/LoginScreen";
 import ProductScreen from "../screens/ProductScreen";
@@ -32,6 +33,8 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer>
+      {/* Register for push + buzz on foreground notifications once signed in. */}
+      {access ? <PushRegistrar /> : null}
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {access ? (
           <>

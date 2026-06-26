@@ -30,7 +30,7 @@ const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
 const statusOf = (s: string) => STATUS[s] ?? { label: s.toUpperCase(), bg: colors.lineSoft, fg: colors.heading };
 
 // The 4-step happy path; a returned order swaps the final step to "Returned".
-const BASE_STEPS = ["Confirmed", "Packed", "On the\nway", "Delivered"];
+const BASE_STEPS = ["Confirmed", "Packed", "On the way", "Delivered"];
 const STEP_INDEX: Record<string, number> = { pending: 0, confirmed: 1, out_for_delivery: 2, delivered: 3 };
 
 function fmtDate(iso: string) {
@@ -72,7 +72,7 @@ export default function OrderDetailScreen() {
   const returned = order.status === "returned";
   // Returned orders show "Returned" as the final step (only then); otherwise the
   // normal 4-step path. The returned step sits at index 3 and is the active one.
-  const STEPS = returned ? ["Confirmed", "Packed", "On the\nway", "Returned"] : BASE_STEPS;
+  const STEPS = returned ? ["Confirmed", "Packed", "On the way", "Returned"] : BASE_STEPS;
   const step = returned ? 3 : STEP_INDEX[order.status] ?? 0;
   const tracking = order.status === "out_for_delivery";
   const rider = order.assignment;
@@ -163,14 +163,26 @@ export default function OrderDetailScreen() {
                   {STEPS.map((label, i) => {
                     const done = i < step;
                     const active = i === step;
-                    const isReturnStep = returned && i === STEPS.length - 1;
+                    const isFirst = i === 0;
+                    const isLast = i === STEPS.length - 1;
+                    const isReturnStep = returned && isLast;
                     // The final "Delivered" step is the active step once delivered;
                     // show a checkmark on it (not the pending dot) to mark completion.
-                    const isDeliveredStep = order.status === "delivered" && active && i === STEPS.length - 1;
+                    const isDeliveredStep = order.status === "delivered" && active && isLast;
                     return (
-                      <View key={i} style={styles.timelineStep}>
+                      <View
+                        key={i}
+                        style={[
+                          styles.timelineStep,
+                          // First/last circles sit flush at the start/end of the
+                          // track (no dangling line before the first or after the
+                          // last); their labels hug the same edge.
+                          isFirst && styles.timelineStepFirst,
+                          isLast && styles.timelineStepLast,
+                        ]}
+                      >
                         <View style={styles.timelineLineWrap}>
-                          {i > 0 ? <View style={[styles.line, i <= step && styles.lineDone]} /> : <View style={styles.line} />}
+                          {!isFirst ? <View style={[styles.line, i <= step && styles.lineDone]} /> : null}
                           <View
                             style={[
                               styles.node,
@@ -187,15 +199,14 @@ export default function OrderDetailScreen() {
                               <View style={[styles.nodeInner, active && styles.nodeInnerActive]} />
                             )}
                           </View>
-                          {i < STEPS.length - 1 ? (
-                            <View style={[styles.line, i < step && styles.lineDone]} />
-                          ) : (
-                            <View style={styles.line} />
-                          )}
+                          {!isLast ? <View style={[styles.line, i < step && styles.lineDone]} /> : null}
                         </View>
                         <Text
+                          numberOfLines={1}
                           style={[
                             styles.stepLabel,
+                            isFirst && styles.stepLabelFirst,
+                            isLast && styles.stepLabelLast,
                             (done || active) && styles.stepLabelDone,
                             isReturnStep && active && styles.stepLabelReturned,
                           ]}
@@ -412,6 +423,8 @@ const styles = StyleSheet.create({
   liveTrack: { fontFamily: fonts.bold, fontSize: 13, color: colors.green },
   timeline: { flexDirection: "row" },
   timelineStep: { flex: 1, alignItems: "center" },
+  timelineStepFirst: { alignItems: "flex-start" },
+  timelineStepLast: { alignItems: "flex-end" },
   timelineLineWrap: { flexDirection: "row", alignItems: "center", width: "100%", justifyContent: "center" },
   line: { flex: 1, height: 2, backgroundColor: colors.line },
   lineDone: { backgroundColor: colors.green },
@@ -422,6 +435,8 @@ const styles = StyleSheet.create({
   nodeInnerActive: { backgroundColor: colors.white },
   nodeReturned: { backgroundColor: RETURNED_AMBER },
   stepLabel: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted, marginTop: 6, textAlign: "center" },
+  stepLabelFirst: { textAlign: "left" },
+  stepLabelLast: { textAlign: "right" },
   stepLabelDone: { color: colors.heading, fontFamily: fonts.semibold },
   stepLabelReturned: { color: RETURNED_AMBER, fontFamily: fonts.bold },
 
@@ -477,7 +492,7 @@ const styles = StyleSheet.create({
   addrIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
   addrText: { flex: 1, fontFamily: fontsAlt.regular, fontSize: 13, color: colors.text, lineHeight: 19 },
 
-  billCard: { backgroundColor: colors.bgSoft, borderRadius: 14, padding: spacing(1.75) },
+  billCard: { backgroundColor: colors.bgSoft, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: spacing(1.75) },
   billRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: spacing(0.5) },
   billLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.heading },
   billValue: { fontFamily: fonts.semibold, fontSize: 14, color: colors.heading },

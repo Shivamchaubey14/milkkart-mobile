@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useUnreadCountQuery } from "../api/baseApi";
+import { useT } from "../i18n/LanguageProvider";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
 import RiderHomeScreen from "../screens/RiderHomeScreen";
@@ -23,14 +24,21 @@ const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
 
 // Placeholder tabs until their features land — kept as named components so the
 // tab labels/headers read correctly.
-const PendingTab = () => <PlaceholderScreen title="Pending deliveries" icon="time-outline" />;
-const EarningsTab = () => <PlaceholderScreen title="Earnings" icon="wallet-outline" />;
+const PendingTab = () => {
+  const t = useT();
+  return <PlaceholderScreen title={t("placeholderPending")} icon="time-outline" />;
+};
+const EarningsTab = () => {
+  const t = useT();
+  return <PlaceholderScreen title={t("placeholderEarnings")} icon="wallet-outline" />;
+};
 
 // Bottom tabs shown to delivery partners (is_rider). Same Cream-Yolk bar as the
 // customer app, but a rider-focused set: Home dashboard, Pending, Earnings, Profile.
 export default function RiderTabs() {
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, 8);
+  const t = useT();
   const { data: unread } = useUnreadCountQuery();
   const unreadCount = unread?.unread_count ?? 0;
   return (
@@ -61,12 +69,13 @@ export default function RiderTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={RiderHomeScreen} />
-      <Tab.Screen name="Pending" component={PendingTab} />
+      <Tab.Screen name="Home" component={RiderHomeScreen} options={{ tabBarLabel: t("tabHome") }} />
+      <Tab.Screen name="Pending" component={PendingTab} options={{ tabBarLabel: t("tabPending") }} />
       <Tab.Screen
         name="Alerts"
         component={NotificationsScreen}
         options={{
+          tabBarLabel: t("tabAlerts"),
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: colors.green,
@@ -76,8 +85,8 @@ export default function RiderTabs() {
           },
         }}
       />
-      <Tab.Screen name="Earnings" component={EarningsTab} />
-      <Tab.Screen name="Profile" component={ProfileStack} />
+      <Tab.Screen name="Earnings" component={EarningsTab} options={{ tabBarLabel: t("tabEarnings") }} />
+      <Tab.Screen name="Profile" component={ProfileStack} options={{ tabBarLabel: t("tabProfile") }} />
     </Tab.Navigator>
   );
 }

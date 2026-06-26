@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RiderDelivery, useDeliverOrderMutation, useReturnOrderMutation } from "../api/baseApi";
 import { imageUrl } from "../api/config";
+import { useT } from "../i18n/LanguageProvider";
 import { useToast } from "./Toast";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -28,6 +29,7 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | null; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const t = useT();
   const [deliverOrder, { isLoading: delivering }] = useDeliverOrderMutation();
   const [returnOrder, { isLoading: returning }] = useReturnOrderMutation();
 
@@ -87,28 +89,28 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
-        toast("Camera permission is needed for a proof photo.", "info");
+        toast(t("toastCameraPerm"), "info");
         return;
       }
       const r = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.4 });
       if (!r.canceled && r.assets[0]?.base64) setPhoto(`data:image/jpeg;base64,${r.assets[0].base64}`);
     } catch {
-      toast("Couldn't open the camera.", "error");
+      toast(t("toastCameraOpen"), "error");
     }
   }
 
   async function confirm() {
     if (!data) return;
     if (otp.trim().length !== 6) {
-      toast("Enter the 6-digit delivery OTP.", "info");
+      toast(t("toastEnterOtp"), "info");
       return;
     }
     try {
       await deliverOrder({ orderNumber: data.order_number, otp: otp.trim(), proof_photo: photo ?? "" }).unwrap();
-      toast("Delivery confirmed!");
+      toast(t("toastDeliveryConfirmed"));
       onClose();
     } catch (e: any) {
-      toast(e?.data?.error || "Couldn't confirm delivery. Check the OTP.", "error");
+      toast(e?.data?.error || t("toastConfirmFailed"), "error");
     }
   }
 
@@ -118,15 +120,15 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
 
   async function returnSelected() {
     if (!data || selected.length === 0) {
-      toast("Select the items the customer refused.", "info");
+      toast(t("toastSelectRefused"), "info");
       return;
     }
     try {
       await returnOrder({ orderNumber: data.order_number, item_ids: selected }).unwrap();
-      toast("Refused items returned.");
+      toast(t("toastRefusedReturned"));
       onClose();
     } catch (e: any) {
-      toast(e?.data?.error || "Couldn't process the return.", "error");
+      toast(e?.data?.error || t("toastReturnFailed"), "error");
     }
   }
 
@@ -148,7 +150,7 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
           <View style={styles.handle} />
           <View style={styles.head}>
             <View style={styles.flex}>
-              <Text style={styles.title}>Confirm delivery</Text>
+              <Text style={styles.title}>{t("confirmDelivery")}</Text>
               {data ? <Text style={styles.sub}>#{data.order_number.slice(0, 8)}</Text> : null}
             </View>
             <Pressable style={styles.close} onPress={onClose} hitSlop={8}>
@@ -157,7 +159,7 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={styles.label}>Delivery OTP</Text>
+            <Text style={styles.label}>{t("deliveryOtp")}</Text>
             {/* Six segmented "cube" boxes backed by one hidden input (matches login). */}
             <Pressable style={styles.otpRow} onPress={() => codeRef.current?.focus()}>
               {Array.from({ length: 6 }, (_, i) => {
@@ -191,27 +193,27 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
             ) : (
               <Pressable style={styles.photoBtn} onPress={addPhoto}>
                 <Ionicons name="camera-outline" size={18} color={colors.green} />
-                <Text style={styles.photoBtnText}>Add proof photo (optional)</Text>
+                <Text style={styles.photoBtnText}>{t("addProofPhoto")}</Text>
               </Pressable>
             )}
 
             <View style={styles.btnRow}>
               <Pressable style={[styles.cancelBtn]} onPress={onClose} disabled={busy}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t("cancel")}</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [styles.confirmBtn, (pressed || busy) && { opacity: 0.85 }]}
                 onPress={confirm}
                 disabled={busy}
               >
-                <Text style={styles.confirmText}>{delivering ? "Confirming…" : "Confirm Delivery"}</Text>
+                <Text style={styles.confirmText}>{delivering ? t("confirming") : t("confirmDeliveryBtn")}</Text>
               </Pressable>
             </View>
 
             {items.length ? (
               <>
                 <View style={styles.divider} />
-                <Text style={styles.refuseLabel}>Customer refused items?</Text>
+                <Text style={styles.refuseLabel}>{t("customerRefused")}</Text>
                 {items.map((it) => {
                   const on = selected.includes(it.id);
                   const img = imageUrl(it.image_url);
@@ -227,7 +229,7 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
                       </View>
                       <View style={styles.flex}>
                         <Text style={styles.itemName} numberOfLines={1}>{it.product_name}</Text>
-                        <Text style={styles.itemMeta}>{it.variant_label} · Qty {it.quantity}</Text>
+                        <Text style={styles.itemMeta}>{it.variant_label} · {t("qtyLabel")} {it.quantity}</Text>
                       </View>
                     </Pressable>
                   );
@@ -243,7 +245,11 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
                 >
                   <Ionicons name="arrow-undo-outline" size={16} color={selected.length ? colors.error : colors.muted} />
                   <Text style={[styles.returnText, selected.length === 0 && { color: colors.muted }]}>
-                    {returning ? "Returning…" : `Return selected${selected.length ? ` (${selected.length})` : ""}`}
+                    {returning
+                      ? t("returning")
+                      : selected.length
+                        ? t("returnSelectedCount", { n: selected.length })
+                        : t("returnSelected")}
                   </Text>
                 </Pressable>
               </>

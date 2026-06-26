@@ -25,18 +25,20 @@ import {
   useUpdateNotificationPreferencesMutation,
 } from "../api/baseApi";
 import { Screen } from "../components/Screen";
+import { useT } from "../i18n/LanguageProvider";
+import type { TKey } from "../i18n/translations";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 type PrefKey = keyof Omit<NotificationPreferences, "updated_at">;
-const CHANNELS: { key: PrefKey; label: string; sub: string }[] = [
-  { key: "push_enabled", label: "Push", sub: "In-app alerts" },
-  { key: "sms_enabled", label: "SMS", sub: "Texts for OTP & delivery" },
-  { key: "email_enabled", label: "Email", sub: "Invoices & statements" },
+const CHANNELS: { key: PrefKey; labelKey: TKey; subKey: TKey }[] = [
+  { key: "push_enabled", labelKey: "prefPush", subKey: "prefPushSub" },
+  { key: "sms_enabled", labelKey: "prefSms", subKey: "prefSmsSub" },
+  { key: "email_enabled", labelKey: "prefEmail", subKey: "prefEmailSub" },
 ];
-const CATEGORIES: { key: PrefKey; label: string; sub: string }[] = [
-  { key: "order_updates", label: "Order updates", sub: "Status changes & delivery" },
-  { key: "subscription_reminders", label: "Subscription reminders", sub: "Low balance, delivery tomorrow" },
-  { key: "promotions", label: "Offers & promotions", sub: "Deals & coupons (opt-in)" },
+const CATEGORIES: { key: PrefKey; labelKey: TKey; subKey: TKey }[] = [
+  { key: "order_updates", labelKey: "prefOrderUpdates", subKey: "prefOrderUpdatesSub" },
+  { key: "subscription_reminders", labelKey: "prefSubReminders", subKey: "prefSubRemindersSub" },
+  { key: "promotions", labelKey: "prefPromos", subKey: "prefPromosSub" },
 ];
 
 const CATEGORY: Record<
@@ -49,20 +51,23 @@ const CATEGORY: Record<
   system: { icon: "notifications", bg: colors.lineSoft, fg: colors.heading },
 };
 
-function timeAgo(iso: string) {
+type Translate = ReturnType<typeof useT>;
+
+function timeAgo(iso: string, t: Translate) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t("justNow");
+  if (m < 60) return t("minutesAgo", { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t("hoursAgo", { n: h });
   const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
+  if (d < 7) return t("daysAgo", { n: d });
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
+  const t = useT();
   const { data: items, isLoading, isFetching, refetch } = useNotificationsQuery();
   const [markRead] = useMarkNotificationReadMutation();
   const [markAllRead, { isLoading: markingAll }] = useMarkAllNotificationsReadMutation();
@@ -89,9 +94,9 @@ export default function NotificationsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.blob} />
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <Text style={styles.headerTitle}>{t("notifications")}</Text>
           <Text style={styles.headerSub}>
-            {unread > 0 ? `${unread} unread` : "You're all caught up"}
+            {unread > 0 ? t("unreadCount", { n: unread }) : t("allCaughtUp")}
           </Text>
         </View>
 
@@ -102,7 +107,7 @@ export default function NotificationsScreen() {
               {markingAll ? (
                 <ActivityIndicator size="small" color={colors.green} />
               ) : (
-                <Text style={styles.markAllText}>Mark all read</Text>
+                <Text style={styles.markAllText}>{t("markAllRead")}</Text>
               )}
             </Pressable>
           ) : null}
@@ -120,8 +125,8 @@ export default function NotificationsScreen() {
             <View style={styles.emptyBadge}>
               <Ionicons name="notifications-outline" size={34} color={colors.green} />
             </View>
-            <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptySub}>Order updates and offers will show up here.</Text>
+            <Text style={styles.emptyTitle}>{t("noNotifications")}</Text>
+            <Text style={styles.emptySub}>{t("notificationsEmptySub")}</Text>
           </View>
         ) : (
           <ScrollView
@@ -147,7 +152,7 @@ export default function NotificationsScreen() {
                       <Text style={styles.itemTitle} numberOfLines={1}>
                         {n.title}
                       </Text>
-                      <Text style={styles.itemTime}>{timeAgo(n.created_at)}</Text>
+                      <Text style={styles.itemTime}>{timeAgo(n.created_at, t)}</Text>
                     </View>
                     {n.body ? (
                       <Text style={styles.itemText} numberOfLines={2}>
@@ -170,6 +175,7 @@ export default function NotificationsScreen() {
 
 function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const { data: prefs, isLoading } = useNotificationPreferencesQuery();
   const [updatePrefs] = useUpdateNotificationPreferencesMutation();
 
@@ -195,11 +201,11 @@ function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => 
 
   if (!mounted) return null;
 
-  const row = (item: { key: PrefKey; label: string; sub: string }) => (
+  const row = (item: { key: PrefKey; labelKey: TKey; subKey: TKey }) => (
     <View key={item.key} style={styles.prefRow}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.prefLabel}>{item.label}</Text>
-        <Text style={styles.prefSub}>{item.sub}</Text>
+        <Text style={styles.prefLabel}>{t(item.labelKey)}</Text>
+        <Text style={styles.prefSub}>{t(item.subKey)}</Text>
       </View>
       <Switch
         value={!!prefs?.[item.key]}
@@ -221,7 +227,7 @@ function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => 
       <Animated.View style={[styles.sheet, { transform: [{ translateY }], paddingBottom: insets.bottom + spacing(2) }]}>
         <View style={styles.handle} />
         <View style={styles.sheetHead}>
-          <Text style={styles.sheetTitle}>Notification settings</Text>
+          <Text style={styles.sheetTitle}>{t("notificationSettings")}</Text>
           <Pressable style={styles.sheetClose} onPress={onClose} hitSlop={8}>
             <Ionicons name="close" size={18} color={colors.heading} />
           </Pressable>
@@ -231,13 +237,13 @@ function SettingsSheet({ visible, onClose }: { visible: boolean; onClose: () => 
           <ActivityIndicator color={colors.green} style={{ marginVertical: spacing(3) }} />
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-            <Text style={styles.prefGroup}>CHANNELS</Text>
+            <Text style={styles.prefGroup}>{t("channels")}</Text>
             <View style={styles.prefCard}>{CHANNELS.map(row)}</View>
 
-            <Text style={styles.prefGroup}>WHAT YOU'LL GET</Text>
+            <Text style={styles.prefGroup}>{t("whatYouGet")}</Text>
             <View style={styles.prefCard}>{CATEGORIES.map(row)}</View>
 
-            <Text style={styles.prefFoot}>Changes save automatically.</Text>
+            <Text style={styles.prefFoot}>{t("changesSaveAuto")}</Text>
           </ScrollView>
         )}
       </Animated.View>
