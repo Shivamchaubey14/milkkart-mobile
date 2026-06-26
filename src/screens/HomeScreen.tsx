@@ -6,6 +6,7 @@ import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleS
 
 import {
   CatalogProduct,
+  useAddressesQuery,
   useAddToCartMutation,
   useBannersQuery,
   useCartQuery,
@@ -15,6 +16,7 @@ import {
   useUpdateCartItemMutation,
 } from "../api/baseApi";
 import { imageUrl } from "../api/config";
+import { AddressTicker } from "../components/AddressTicker";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
 import { SearchBar } from "../components/SearchBar";
@@ -36,6 +38,13 @@ export default function HomeScreen() {
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners, refetch: refetchBanners } = useBannersQuery();
   const { data: categories, refetch: refetchCategories } = useCategoriesQuery();
+
+  // Saved-address labels (default first) for the "Deliver to" ticker.
+  const { data: addresses } = useAddressesQuery();
+  const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : "Address");
+  const deliverLabels = [...(addresses ?? [])]
+    .sort((a, b) => Number(b.is_default) - Number(a.is_default))
+    .map((a) => cap(a.label));
 
   // null = "All"; otherwise a category id used to filter the product query.
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
@@ -119,8 +128,7 @@ export default function HomeScreen() {
             <View>
               <Text style={styles.deliverLabel}>DELIVER TO</Text>
               <View style={styles.deliverRow}>
-                <Text style={styles.deliverValue}>Home · 12 min</Text>
-                <Ionicons name="chevron-down" size={16} color={colors.white} />
+                <AddressTicker labels={deliverLabels} style={styles.deliverValue} />
               </View>
             </View>
             <View style={styles.avatar}>
