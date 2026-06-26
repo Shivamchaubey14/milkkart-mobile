@@ -18,6 +18,7 @@ import {
 
 import { api } from "./src/api/baseApi";
 import { ToastProvider } from "./src/components/Toast";
+import { LanguageProvider } from "./src/i18n/LanguageProvider";
 import RootNavigator from "./src/navigation/RootNavigator";
 import SplashScreen from "./src/screens/SplashScreen";
 import { store } from "./src/store";
@@ -73,9 +74,11 @@ export default function App() {
     <Provider store={store}>
       <SafeAreaProvider>
         <StatusBar style="dark" />
-        <ToastProvider>
-          <Boot />
-        </ToastProvider>
+        <LanguageProvider>
+          <ToastProvider>
+            <Boot />
+          </ToastProvider>
+        </LanguageProvider>
       </SafeAreaProvider>
     </Provider>
   );

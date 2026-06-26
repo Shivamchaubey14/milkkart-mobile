@@ -15,10 +15,13 @@ import {
 import { imageUrl } from "../api/config";
 import { DeliverModal } from "../components/DeliverModal";
 import { DutyToggle } from "../components/DutyToggle";
+import { LanguagePicker } from "../components/LanguagePicker";
 import { NumberPlate } from "../components/NumberPlate";
 import { OrderItemsModal } from "../components/OrderItemsModal";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import { useT } from "../i18n/LanguageProvider";
+import type { TKey } from "../i18n/translations";
 import { presentLocalAlert } from "../notifications/push";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -34,14 +37,15 @@ const dateISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
 
 const TINTS = ["#e2ecf9", "#e6f5ec", "#fde2e4", "#f6efdf", "#efe6f7", "#e2f3f5"];
 const ACTIVE = ["assigned", "accepted", "picked_up"];
-const STATUS_LABEL: Record<string, string> = {
-  assigned: "NEW",
-  accepted: "ACCEPTED",
-  picked_up: "OUT FOR DELIVERY",
+const STATUS_LABEL_KEY: Record<string, TKey> = {
+  assigned: "statusNew",
+  accepted: "statusAccepted",
+  picked_up: "statusOutForDelivery",
 };
 
 export default function RiderHomeScreen() {
   const toast = useToast();
+  const t = useT();
   const { data: me } = useMeQuery();
   const { data: duty } = useRiderDutyQuery();
   const [setRiderDuty] = useSetRiderDutyMutation();
@@ -73,14 +77,14 @@ export default function RiderHomeScreen() {
     fresh.forEach((d) => seen.add(d.order_number));
     if (fresh.length > 0) {
       const d = fresh[0];
-      const more = fresh.length > 1 ? ` (+${fresh.length - 1} more)` : "";
+      const more = fresh.length > 1 ? " " + t("moreCount", { n: fresh.length - 1 }) : "";
       presentLocalAlert(
-        "New delivery assigned 🛵",
-        `Order #${d.order_number.slice(0, 8)}${d.address ? " — " + d.address : ""}${more}`,
+        t("newDeliveryAssigned"),
+        `${t("orderLabel")} #${d.order_number.slice(0, 8)}${d.address ? " — " + d.address : ""}${more}`,
         { type: "new_assignment", order_number: d.order_number },
       );
     }
-  }, [day]);
+  }, [day, t]);
 
   // Local mirror of duty so the toggle animates immediately, then syncs.
   const [onDuty, setOnDuty] = useState(true);
@@ -94,7 +98,7 @@ export default function RiderHomeScreen() {
       .unwrap()
       .catch(() => {
         setOnDuty(!v);
-        toast("Couldn't update your duty status.", "error");
+        toast(t("toastDutyFailed"), "error");
       });
   };
 
@@ -103,13 +107,13 @@ export default function RiderHomeScreen() {
     if (event.type === "set" && picked) setDate(picked);
   };
 
-  const name = me?.name || "Rider";
+  const name = me?.name || t("rider");
   const initial = (name[0] || "R").toUpperCase();
-  const soon = (what: string) => () => toast(`${what} — coming soon.`, "info");
+  const soon = () => () => toast(t("comingSoon"), "info");
 
   // Action button advances the assignment: Accept → Pickup → Delivered.
   // Accept/Pickup hit the backend; Delivered (OTP) is wired in a later slice.
-  const actionLabel = (s: string) => (s === "assigned" ? "Accept" : s === "accepted" ? "Pickup" : "Delivered");
+  const actionLabel = (s: string) => (s === "assigned" ? t("accept") : s === "accepted" ? t("pickup") : t("deliver"));
   const advance = async (d: RiderDelivery) => {
     if (d.status === "picked_up") {
       setDeliverFor(d); // open the OTP + proof / return sheet
@@ -118,13 +122,13 @@ export default function RiderHomeScreen() {
     try {
       if (d.status === "assigned") {
         await acceptOrder(d.order_number).unwrap();
-        toast("Order accepted.");
+        toast(t("toastOrderAccepted"));
       } else {
         await pickupOrder(d.order_number).unwrap();
-        toast("Picked up — out for delivery.");
+        toast(t("toastPickedUp"));
       }
     } catch {
-      toast("Couldn't update the order. Please try again.", "error");
+      toast(t("toastUpdateFailed"), "error");
     }
   };
 
@@ -171,14 +175,17 @@ export default function RiderHomeScreen() {
             {duty?.vehicle_number ? <NumberPlate number={duty.vehicle_number} style={styles.plate} /> : null}
           </View>
 
+          {/* Language chooser — sits just below the number plate / identity row. */}
+          <LanguagePicker />
+
           <View style={styles.dutyRow}>
             <View style={styles.dutyTextWrap}>
               <View style={styles.dutyLabelRow}>
                 <View style={[styles.statusDot, { backgroundColor: onDuty ? colors.green : "rgba(255,255,255,0.4)" }]} />
-                <Text style={styles.dutyLabel}>{onDuty ? "On duty" : "Off duty"}</Text>
+                <Text style={styles.dutyLabel}>{onDuty ? t("onDuty") : t("offDuty")}</Text>
               </View>
               <Text style={styles.dutyHint}>
-                {onDuty ? "Accepting deliveries" : "Not accepting deliveries"}
+                {onDuty ? t("acceptingDeliveries") : t("notAcceptingDeliveries")}
               </Text>
             </View>
             <DutyToggle value={onDuty} onChange={toggleDuty} />
@@ -187,7 +194,7 @@ export default function RiderHomeScreen() {
 
         {/* Today's snapshot */}
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Today</Text>
+          <Text style={styles.sectionTitle}>{t("today")}</Text>
           <Pressable style={styles.datePick} onPress={() => setShowPicker(true)} hitSlop={6}>
             <Ionicons name="calendar-outline" size={15} color={colors.green} />
             <Text style={styles.datePickText}>{fmtDay(date)}</Text>
@@ -203,28 +210,28 @@ export default function RiderHomeScreen() {
           />
         ) : null}
         <View style={styles.statRow}>
-          <StatCard icon="checkmark-done" bg={colors.greenTint} fg={colors.green} value={String(stats?.delivered ?? 0)} label="Delivered" />
-          <StatCard icon="time-outline" bg={colors.yellowTint} fg="#b98421" value={String(stats?.pending ?? 0)} label="Pending" />
-          <StatCard icon="cash-outline" bg={colors.greenTint} fg={colors.green} value={money(stats?.earnings ?? 0)} label="Earnings" />
+          <StatCard icon="checkmark-done" bg={colors.greenTint} fg={colors.green} value={String(stats?.delivered ?? 0)} label={t("delivered")} />
+          <StatCard icon="time-outline" bg={colors.yellowTint} fg="#b98421" value={String(stats?.pending ?? 0)} label={t("pending")} />
+          <StatCard icon="cash-outline" bg={colors.greenTint} fg={colors.green} value={money(stats?.earnings ?? 0)} label={t("earnings")} />
         </View>
 
         {/* Cash on delivery */}
         <View style={styles.codCard}>
-          <Text style={styles.codLabel}>CASH ON DELIVERY</Text>
+          <Text style={styles.codLabel}>{t("cashOnDelivery")}</Text>
           <View style={styles.codRow}>
             <View style={styles.codCol}>
-              <Text style={styles.codColLabel}>To collect</Text>
+              <Text style={styles.codColLabel}>{t("toCollect")}</Text>
               <Text style={styles.codAmount}>{money(stats?.cod_to_collect ?? 0)}</Text>
             </View>
             <View style={[styles.codCol, styles.codColRight]}>
-              <Text style={styles.codColLabel}>Collected</Text>
+              <Text style={styles.codColLabel}>{t("collected")}</Text>
               <Text style={[styles.codAmount, { color: colors.white }]}>{money(stats?.cod_collected ?? 0)}</Text>
             </View>
           </View>
-          <Pressable style={styles.settleBtn} onPress={soon("Deposit")}>
-            <Text style={styles.settleText}>Deposit pending to MilkKart</Text>
+          <Pressable style={styles.settleBtn} onPress={soon()}>
+            <Text style={styles.settleText}>{t("depositPending")}</Text>
             <View style={styles.settleRight}>
-              <Text style={styles.settleAction}>Settle</Text>
+              <Text style={styles.settleAction}>{t("settle")}</Text>
               <Ionicons name="arrow-forward" size={15} color={colors.white} />
             </View>
           </Pressable>
@@ -232,14 +239,14 @@ export default function RiderHomeScreen() {
 
         {/* Active deliveries */}
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Active deliveries</Text>
-          {active.length ? <Text style={styles.pendingPill}>{active.length} PENDING</Text> : null}
+          <Text style={styles.sectionTitle}>{t("activeDeliveries")}</Text>
+          {active.length ? <Text style={styles.pendingPill}>{t("pendingCount", { n: active.length })}</Text> : null}
         </View>
 
         {current ? (
           <View style={styles.currentCard}>
             <View style={styles.currentTop}>
-              <Text style={styles.currentTag}>● {STATUS_LABEL[current.status] || "CURRENT"}</Text>
+              <Text style={styles.currentTag}>● {STATUS_LABEL_KEY[current.status] ? t(STATUS_LABEL_KEY[current.status]) : "CURRENT"}</Text>
               <Text style={styles.orderNo}>#{current.order_number.slice(0, 8)}</Text>
             </View>
             <View style={styles.currentBody}>
@@ -247,7 +254,7 @@ export default function RiderHomeScreen() {
               <View style={styles.amountCol}>
                 <Text style={styles.deliveryAmount}>{money(current.total)}</Text>
                 <Text style={current.is_cod ? styles.collectCod : styles.collectPrepaid}>
-                  {current.is_cod ? "Collect cash" : "Prepaid"}
+                  {current.is_cod ? t("collectCash") : t("prepaid")}
                 </Text>
               </View>
             </View>
@@ -256,11 +263,11 @@ export default function RiderHomeScreen() {
               <Text style={styles.fullAddress}>{current.address}</Text>
             </View>
             <View style={styles.actionRow}>
-              <Pressable style={styles.navigateBtn} onPress={soon("Navigation")}>
+              <Pressable style={styles.navigateBtn} onPress={soon()}>
                 <Ionicons name="navigate-outline" size={16} color={colors.green} />
-                <Text style={styles.navigateText}>Navigate</Text>
+                <Text style={styles.navigateText}>{t("navigate")}</Text>
               </Pressable>
-              <Pressable style={styles.callBtn} onPress={soon("Call")}>
+              <Pressable style={styles.callBtn} onPress={soon()}>
                 <Ionicons name="call" size={17} color={colors.green} />
               </Pressable>
               <Pressable
@@ -275,7 +282,7 @@ export default function RiderHomeScreen() {
         ) : (
           <View style={styles.emptyCard}>
             <Ionicons name="bicycle-outline" size={22} color={colors.muted} />
-            <Text style={styles.emptyText}>No active deliveries right now.</Text>
+            <Text style={styles.emptyText}>{t("noActiveDeliveries")}</Text>
           </View>
         )}
 
@@ -285,8 +292,8 @@ export default function RiderHomeScreen() {
         ))}
 
         {active.length ? (
-          <Pressable style={styles.viewAllBtn} onPress={soon("All deliveries")}>
-            <Text style={styles.viewAllText}>View all deliveries</Text>
+          <Pressable style={styles.viewAllBtn} onPress={soon()}>
+            <Text style={styles.viewAllText}>{t("viewAllDeliveries")}</Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -335,6 +342,7 @@ function ThumbStack({
 }
 
 function DeliveryRow({ d, onOpen }: { d: RiderDelivery; onOpen: () => void }) {
+  const t = useT();
   return (
     <View style={styles.deliveryRow}>
       <ThumbStack images={d.item_images} count={d.item_count} size={40} onPress={onOpen} />
@@ -343,7 +351,7 @@ function DeliveryRow({ d, onOpen }: { d: RiderDelivery; onOpen: () => void }) {
           <Text style={styles.deliveryName} numberOfLines={1}>{d.address}</Text>
           <View style={[styles.payPill, d.is_cod ? styles.payCod : styles.payPrepaid]}>
             <Text style={[styles.payText, d.is_cod ? styles.payTextCod : styles.payTextPrepaid]}>
-              {d.is_cod ? "COD" : "PREPAID"}
+              {d.is_cod ? t("codShort") : t("prepaidShort")}
             </Text>
           </View>
         </View>
@@ -370,12 +378,12 @@ function StatCard({
   return (
     <View style={[styles.statCard, { backgroundColor: bg }]}>
       <View style={styles.statTop}>
-        <Ionicons name={icon} size={17} color={fg} />
-        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {/* Icon is absolutely pinned to the left so the value can use the full
+            card width and stays centered — same fixed size across all cards. */}
+        <Ionicons name={icon} size={17} color={fg} style={styles.statIcon} />
+        <Text style={styles.statValue} numberOfLines={1}>
           {value}
         </Text>
-        {/* Spacer mirrors the icon width so the value stays centered in the card. */}
-        <View style={styles.statSpacer} />
       </View>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -426,9 +434,9 @@ const styles = StyleSheet.create({
   // Stat cards
   statRow: { flexDirection: "row", gap: spacing(1.25) },
   statCard: { flex: 1, borderRadius: 16, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.25), alignItems: "center" },
-  statTop: { flexDirection: "row", alignItems: "center", width: "100%", gap: 6 },
-  statSpacer: { width: 17 },
-  statValue: { flex: 1, textAlign: "center", fontFamily: fonts.bold, fontSize: 17, color: colors.heading },
+  statTop: { width: "100%", minHeight: 22, alignItems: "center", justifyContent: "center", position: "relative" },
+  statIcon: { position: "absolute", left: 0, top: "50%", marginTop: -8.5 },
+  statValue: { textAlign: "center", fontFamily: fonts.bold, fontSize: 12, color: colors.heading },
   statLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 5, textAlign: "center" },
 
   // Cash-on-delivery card

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RiderDelivery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
+import { useT } from "../i18n/LanguageProvider";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const TINTS = ["#e2ecf9", "#e6f5ec", "#fde2e4", "#f6efdf", "#efe6f7", "#e2f3f5"];
@@ -13,6 +14,7 @@ const TINTS = ["#e2ecf9", "#e6f5ec", "#fde2e4", "#f6efdf", "#efe6f7", "#e2f3f5"]
 // what's in the order. Same slide-up + fade pattern as the other sheets.
 export function OrderItemsModal({ delivery, onClose }: { delivery: RiderDelivery | null; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const visible = !!delivery;
   const translateY = useRef(new Animated.Value(700)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
@@ -56,10 +58,10 @@ export function OrderItemsModal({ delivery, onClose }: { delivery: RiderDelivery
 
         <View style={styles.head}>
           <View style={styles.flex}>
-            <Text style={styles.title}>Order items</Text>
+            <Text style={styles.title}>{t("orderItems")}</Text>
             {data ? (
               <Text style={styles.sub}>
-                #{data.order_number.slice(0, 8)} · {count} {count === 1 ? "item" : "items"}
+                #{data.order_number.slice(0, 8)} · {count} {count === 1 ? t("itemSingular") : t("itemPlural")}
               </Text>
             ) : null}
           </View>
