@@ -239,11 +239,32 @@ export default function RiderHomeScreen() {
           />
         ) : null}
         <View style={styles.statRow}>
-          <StatCard icon="checkmark-done" bg={colors.greenTint} fg={colors.green} value={String(stats?.delivered ?? 0)} label={t("delivered")} />
-          <StatCard icon="time-outline" bg={colors.yellowTint} fg="#b98421" value={String(stats?.pending ?? 0)} label={t("pending")} />
+          <StatCard
+            icon="checkmark-done"
+            bg={colors.greenTint}
+            fg={colors.green}
+            value={String(stats?.delivered ?? 0)}
+            label={t("delivered")}
+            onPress={() => navigation.navigate("RiderDeliveries", { kind: "delivered" })}
+          />
+          <StatCard
+            icon="time-outline"
+            bg={colors.yellowTint}
+            fg="#b98421"
+            value={String(stats?.pending ?? 0)}
+            label={t("pending")}
+            onPress={() => navigation.navigate("RiderDeliveries", { kind: "pending" })}
+          />
           {/* Returned tile only when there is something returned (like the web). */}
           {(stats?.returned ?? 0) > 0 ? (
-            <StatCard icon="arrow-undo-outline" bg="#fdecd9" fg="#b46b00" value={String(stats?.returned ?? 0)} label={t("returned")} />
+            <StatCard
+              icon="arrow-undo-outline"
+              bg="#fdecd9"
+              fg="#b46b00"
+              value={String(stats?.returned ?? 0)}
+              label={t("returned")}
+              onPress={() => navigation.navigate("RiderDeliveries", { kind: "returned" })}
+            />
           ) : null}
           <StatCard icon="cash-outline" bg={colors.greenTint} fg={colors.green} value={money(stats?.earnings ?? 0)} label={t("earnings")} />
         </View>
@@ -460,15 +481,22 @@ function StatCard({
   fg,
   value,
   label,
+  onPress,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   bg: string;
   fg: string;
   value: string;
   label: string;
+  // When set, the card becomes tappable (opens that status' history list).
+  onPress?: () => void;
 }) {
+  const Container: any = onPress ? Pressable : View;
   return (
-    <View style={[styles.statCard, { backgroundColor: bg }]}>
+    <Container
+      style={({ pressed }: { pressed?: boolean }) => [styles.statCard, { backgroundColor: bg }, pressed && { opacity: 0.85 }]}
+      onPress={onPress}
+    >
       {/* Icon, value and label stacked vertically (centered) so the value never
           overlaps the icon — even for wide values like earnings. */}
       <Ionicons name={icon} size={18} color={fg} />
@@ -476,7 +504,7 @@ function StatCard({
         {value}
       </Text>
       <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
-    </View>
+    </Container>
   );
 }
 

@@ -247,6 +247,17 @@ export type RiderDelivery = {
   item_count: number;
   item_images: string[];
   items: RiderDeliveryItem[];
+  // Present on history-list rows: the day it counts against (delivered/assigned),
+  // as a YYYY-MM-DD string, plus the full ISO timestamp. Null if never stamped.
+  date?: string | null;
+  at?: string | null;
+};
+
+export type RiderDeliveryKind = "delivered" | "pending" | "returned";
+
+export type RiderDeliveriesList = {
+  kind: RiderDeliveryKind;
+  deliveries: RiderDelivery[];
 };
 
 export type RiderDay = {
@@ -490,6 +501,10 @@ export const api = createApi({
     }),
     riderDay: build.query<RiderDay, string | undefined>({
       query: (date) => `/rider/day/${date ? `?date=${date}` : ""}`,
+      providesTags: ["RiderDay"],
+    }),
+    riderDeliveries: build.query<RiderDeliveriesList, RiderDeliveryKind>({
+      query: (kind) => `/rider/deliveries/?kind=${kind}`,
       providesTags: ["RiderDay"],
     }),
     acceptOrder: build.mutation<unknown, string>({
@@ -808,6 +823,7 @@ export const {
   useRiderDutyQuery,
   useSetRiderDutyMutation,
   useRiderDayQuery,
+  useRiderDeliveriesQuery,
   useAcceptOrderMutation,
   usePickupOrderMutation,
   useDeliverOrderMutation,

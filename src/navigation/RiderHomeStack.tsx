@@ -1,5 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import { RiderDeliveryKind } from "../api/baseApi";
+import RiderDeliveriesScreen from "../screens/RiderDeliveriesScreen";
 import RiderHomeScreen from "../screens/RiderHomeScreen";
 import RiderNavigateScreen from "../screens/RiderNavigateScreen";
 
@@ -8,6 +10,7 @@ import RiderNavigateScreen from "../screens/RiderNavigateScreen";
 export type RiderHomeStackParamList = {
   RiderHome: undefined;
   RiderNavigate: { orderNumber: string; address: string; destLat: string | null; destLng: string | null };
+  RiderDeliveries: { kind: RiderDeliveryKind };
 };
 
 const Stack = createNativeStackNavigator<RiderHomeStackParamList>();
@@ -17,6 +20,7 @@ export default function RiderHomeStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="RiderHome" component={RiderHomeScreen} />
       <Stack.Screen name="RiderNavigate" component={RiderNavigateScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="RiderDeliveries" component={RiderDeliveriesScreen} options={{ animation: "slide_from_right" }} />
     </Stack.Navigator>
   );
 }
