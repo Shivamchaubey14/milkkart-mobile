@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   RiderDelivery,
@@ -366,9 +366,18 @@ export default function RiderHomeScreen() {
                 <Ionicons name="navigate-outline" size={16} color={colors.green} />
                 <Text style={styles.navigateText}>{t("navigate")}</Text>
               </Pressable>
-              <Pressable style={styles.callBtn} onPress={soon()}>
-                <Ionicons name="call" size={17} color={colors.green} />
-              </Pressable>
+              {/* Call the customer — only once the order is accepted/picked up
+                  (after the rider taps Accept), not while it's just assigned. */}
+              {current.status !== "assigned" ? (
+                <Pressable
+                  style={styles.callBtn}
+                  onPress={() =>
+                    current.customer_phone ? Linking.openURL(`tel:${current.customer_phone}`) : toast(t("comingSoon"), "info")
+                  }
+                >
+                  <Ionicons name="call" size={17} color={colors.green} />
+                </Pressable>
+              ) : null}
               <Pressable
                 style={({ pressed }) => [styles.deliveredBtn, (pressed || accepting || picking) && { opacity: 0.85 }]}
                 onPress={() => advance(current)}
