@@ -12,6 +12,7 @@ export const LANGUAGES: { code: Lang; label: string }[] = [
 export const STRINGS = {
   en: {
     rider: "Rider",
+    customer: "Customer",
     language: "Language",
     onDuty: "On duty",
     offDuty: "Off duty",
@@ -25,6 +26,9 @@ export const STRINGS = {
     cashOnDelivery: "CASH ON DELIVERY",
     toCollect: "To collect",
     collected: "Collected",
+    paidViaUpi: "Paid via UPI",
+    cashLabel: "Cash",
+    upiLabel: "UPI",
     depositPending: "Deposit pending to MilkKart",
     settle: "Settle",
     activeDeliveries: "Active deliveries",
@@ -134,6 +138,7 @@ export const STRINGS = {
   },
   hi: {
     rider: "राइडर",
+    customer: "ग्राहक",
     language: "भाषा",
     onDuty: "ड्यूटी पर",
     offDuty: "ड्यूटी बंद",
@@ -147,6 +152,9 @@ export const STRINGS = {
     cashOnDelivery: "कैश ऑन डिलीवरी",
     toCollect: "लेना है",
     collected: "मिल गया",
+    paidViaUpi: "UPI से मिला",
+    cashLabel: "नकद",
+    upiLabel: "UPI",
     depositPending: "मिल्ककार्ट को जमा करना बाकी",
     settle: "जमा करें",
     activeDeliveries: "चालू डिलीवरी",

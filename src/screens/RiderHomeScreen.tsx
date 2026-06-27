@@ -65,11 +65,26 @@ export default function RiderHomeScreen() {
   const [deliverFor, setDeliverFor] = useState<RiderDelivery | null>(null);
   const [upiFor, setUpiFor] = useState<RiderDelivery | null>(null);
   const [slipFor, setSlipFor] = useState<RiderDelivery | null>(null);
+  // Order whose COD was collected via the UPI QR — so the deliver call records it
+  // as UPI-collected (vs cash) and it shows in the COD summary.
+  const [upiPaidOrder, setUpiPaidOrder] = useState<string | null>(null);
   // Poll so a freshly-assigned order surfaces (and alerts) within ~20s without
   // the rider pulling to refresh.
-  const { data: day, isFetching, refetch } = useRiderDayQuery(dateISO(date), {
+  const { data: day, refetch } = useRiderDayQuery(dateISO(date), {
     pollingInterval: 20000,
   });
+
+  // Only show the pull-to-refresh spinner for a deliberate pull. The 20s
+  // background poll (and re-fetches) update the data silently — no auto spinner.
+  const [refreshing, setRefreshing] = useState(false);
+  const onPullRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // In-app alert path: when a brand-new "assigned" order appears, fire a local
   // notification + buzz so the rider is alerted even without remote push (works
@@ -152,7 +167,7 @@ export default function RiderHomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onPullRefresh} tintColor={colors.green} colors={[colors.green]} />
         }
       >
         {/* Rider identity + duty toggle */}
@@ -246,13 +261,25 @@ export default function RiderHomeScreen() {
               <Text style={[styles.codAmount, { color: colors.white }]}>{money(stats?.cod_collected ?? 0)}</Text>
             </View>
           </View>
-          <Pressable style={styles.settleBtn} onPress={soon()}>
-            <Text style={styles.settleText}>{t("depositPending")}</Text>
-            <View style={styles.settleRight}>
-              <Text style={styles.settleAction}>{t("settle")}</Text>
-              <Ionicons name="arrow-forward" size={15} color={colors.white} />
+          {/* How the collected cash split between cash-in-hand and UPI QR
+              (paid straight to MilkKart). */}
+          <View style={styles.splitRow}>
+            <View style={styles.splitCol}>
+              <View style={styles.splitHead}>
+                <Ionicons name="cash-outline" size={14} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.splitLabel}>{t("cashLabel")}</Text>
+              </View>
+              <Text style={styles.splitAmount}>{money(stats?.cod_collected_cash ?? 0)}</Text>
             </View>
-          </Pressable>
+            <View style={styles.splitDivider} />
+            <View style={[styles.splitCol, styles.splitColRight]}>
+              <View style={styles.splitHead}>
+                <Ionicons name="qr-code-outline" size={14} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.splitLabel}>{t("upiLabel")}</Text>
+              </View>
+              <Text style={[styles.splitAmount, { color: colors.green }]}>{money(stats?.cod_collected_upi ?? 0)}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Active deliveries */}
@@ -334,13 +361,22 @@ export default function RiderHomeScreen() {
       </ScrollView>
 
       <OrderItemsModal delivery={itemsFor} onClose={() => setItemsFor(null)} />
-      <DeliverModal delivery={deliverFor} onClose={() => setDeliverFor(null)} />
+      <DeliverModal
+        delivery={deliverFor}
+        paidViaUpi={!!deliverFor && deliverFor.order_number === upiPaidOrder}
+        onClose={() => {
+          if (deliverFor && deliverFor.order_number === upiPaidOrder) setUpiPaidOrder(null);
+          setDeliverFor(null);
+        }}
+      />
       <UpiQrModal
         delivery={upiFor}
         onClose={() => setUpiFor(null)}
         onPaid={() => {
           const d = upiFor;
           setUpiFor(null);
+          // Remember this order was paid via UPI so the deliver step records it.
+          if (d) setUpiPaidOrder(d.order_number);
           // Generate the payment slip once the rider confirms payment. Stagger
           // so the QR sheet finishes dismissing first (avoids overlapping modals).
           if (d) setTimeout(() => setSlipFor(d), 280);
@@ -501,10 +537,21 @@ const styles = StyleSheet.create({
   codColRight: { alignItems: "flex-end" },
   codColLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)" },
   codAmount: { fontFamily: fonts.bold, fontSize: 22, color: colors.yellow, marginTop: 3 },
-  settleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: 12, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.75), marginTop: spacing(2) },
-  settleText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.white },
-  settleRight: { flexDirection: "row", alignItems: "center", gap: 4 },
-  settleAction: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
+  splitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(1.75),
+    marginTop: spacing(2),
+  },
+  splitCol: { flex: 1 },
+  splitColRight: { alignItems: "flex-end" },
+  splitDivider: { width: 1, alignSelf: "stretch", backgroundColor: "rgba(255,255,255,0.12)", marginHorizontal: spacing(1.5) },
+  splitHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+  splitLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.7)" },
+  splitAmount: { fontFamily: fonts.bold, fontSize: 17, color: colors.white, marginTop: 4 },
 
   // Current delivery
   currentCard: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1.5, borderColor: colors.green, padding: spacing(1.75) },

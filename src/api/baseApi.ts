@@ -234,6 +234,9 @@ export type RiderDeliveryItem = {
 export type RiderDelivery = {
   order_number: string;
   address: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_avatar: string;
   dest_lat: string | null;
   dest_lng: string | null;
   total: string;
@@ -257,6 +260,8 @@ export type RiderDay = {
     rider_fee: string;
     cod_to_collect: string;
     cod_collected: string;
+    cod_collected_upi: string;
+    cod_collected_cash: string;
   };
   deliveries: RiderDelivery[];
 };
@@ -495,7 +500,7 @@ export const api = createApi({
       query: (orderNumber) => ({ url: `/rider/orders/${orderNumber}/pickup/`, method: "POST" }),
       invalidatesTags: ["RiderDay"],
     }),
-    deliverOrder: build.mutation<unknown, { orderNumber: string; otp: string; proof_photo?: string }>({
+    deliverOrder: build.mutation<unknown, { orderNumber: string; otp: string; proof_photo?: string; paid_via_upi?: boolean }>({
       query: ({ orderNumber, ...body }) => ({ url: `/rider/orders/${orderNumber}/deliver/`, method: "POST", body }),
       invalidatesTags: ["RiderDay"],
     }),

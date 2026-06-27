@@ -25,7 +25,17 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 // Bottom-sheet to complete a delivery: enter the OTP, optionally attach a proof
 // photo, then Confirm. A "Customer refused items?" section lets the rider return
 // selected line items instead. Same slide-up + fade pattern as the other sheets.
-export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | null; onClose: () => void }) {
+export function DeliverModal({
+  delivery,
+  onClose,
+  paidViaUpi = false,
+}: {
+  delivery: RiderDelivery | null;
+  onClose: () => void;
+  // True when this COD order's amount was already collected via the UPI QR, so
+  // the backend records it as UPI-collected (vs cash-in-hand).
+  paidViaUpi?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const t = useT();
@@ -106,7 +116,12 @@ export function DeliverModal({ delivery, onClose }: { delivery: RiderDelivery | 
       return;
     }
     try {
-      await deliverOrder({ orderNumber: data.order_number, otp: otp.trim(), proof_photo: photo ?? "" }).unwrap();
+      await deliverOrder({
+        orderNumber: data.order_number,
+        otp: otp.trim(),
+        proof_photo: photo ?? "",
+        paid_via_upi: paidViaUpi,
+      }).unwrap();
       toast(t("toastDeliveryConfirmed"));
       onClose();
     } catch (e: any) {
