@@ -19,12 +19,23 @@
       "bundleIdentifier": "in.milkkart.app"
     },
     "android": {
-      "package": "in.milkkart.app"
+      "package": "in.milkkart.app",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-secure-store",
       "expo-font",
       "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MilkKart uses your location to navigate to delivery addresses."
+        }
+      ],
       "@react-native-community/datetimepicker",
       [
         "expo-image-picker",
@@ -33,6 +44,12 @@
           "photosPermission": "MilkKart accesses your photos so riders can attach a delivery proof photo."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "cae959ce-8f19-4c03-86e9-1f5cf6f8d2c8"
+      }
+    },
+    "owner": "shivam1214"
   }
 }

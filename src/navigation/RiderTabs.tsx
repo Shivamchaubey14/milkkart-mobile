@@ -6,8 +6,8 @@ import { useUnreadCountQuery } from "../api/baseApi";
 import { useT } from "../i18n/LanguageProvider";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import PlaceholderScreen from "../screens/PlaceholderScreen";
-import RiderHomeScreen from "../screens/RiderHomeScreen";
 import ProfileStack from "./ProfileStack";
+import RiderHomeStack from "./RiderHomeStack";
 import { colors, fonts, palette } from "../theme";
 
 const Tab = createBottomTabNavigator();
@@ -69,7 +69,7 @@ export default function RiderTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={RiderHomeScreen} options={{ tabBarLabel: t("tabHome") }} />
+      <Tab.Screen name="Home" component={RiderHomeStack} options={{ tabBarLabel: t("tabHome") }} />
       <Tab.Screen name="Pending" component={PendingTab} options={{ tabBarLabel: t("tabPending") }} />
       <Tab.Screen
         name="Alerts"

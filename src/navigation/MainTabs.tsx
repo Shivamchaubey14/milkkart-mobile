@@ -102,7 +102,19 @@ export default function MainTabs() {
           },
         }}
       />
-      <Tab.Screen name="Profile" component={ProfileStack} />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileStack}
+        listeners={({ navigation }) => ({
+          // Always land on the profile root when the tab is tapped — otherwise a
+          // screen pushed into this tab (e.g. OrderDetail after checkout) would
+          // show instead of the profile.
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("Profile", { screen: "ProfileHome" });
+          },
+        })}
+      />
     </Tab.Navigator>
   );
 }

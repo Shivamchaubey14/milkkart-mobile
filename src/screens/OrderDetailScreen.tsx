@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { OrderItemDetail, useOrderDetailQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { DeliveredCelebration } from "../components/DeliveredCelebration";
+import { useInvoiceDownloader } from "../invoices/useInvoiceDownloader";
 import { NumberPlate } from "../components/NumberPlate";
 import { Screen } from "../components/Screen";
 import TrackingMap from "../components/TrackingMap";
@@ -55,7 +56,28 @@ export default function OrderDetailScreen() {
   const { orderNumber } = useRoute<RouteProp<ProfileStackParamList, "OrderDetail">>().params;
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const toast = useToast();
-  const { data: order, isLoading, isFetching, refetch } = useOrderDetailQuery(orderNumber);
+  const { download: downloadInvoice, busy: invoiceBusy } = useInvoiceDownloader();
+  // Poll while the order is in progress so the timeline + live map update on
+  // their own (e.g. the moment the rider picks up → "On the way" + map appears),
+  // no pull-to-refresh needed. Stops once the order reaches a terminal state.
+  const [live, setLive] = useState(true);
+  const { data: order, isLoading, refetch } = useOrderDetailQuery(orderNumber, {
+    pollingInterval: live ? 3000 : 0,
+  });
+  useEffect(() => {
+    if (order) setLive(!["delivered", "cancelled", "returned"].includes(order.status));
+  }, [order?.status]);
+  // Background polling updates silently; only spin the pull-to-refresh control
+  // for an explicit user pull (not on every poll).
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
   const [eta, setEta] = useState("");
 
   if (isLoading || !order) {
@@ -102,7 +124,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
         }
       >
         {/* Header */}
@@ -290,6 +312,24 @@ export default function OrderDetailScreen() {
             <View style={styles.billDivider} />
             <BillRow label="Total" value={money(order.total)} strong />
           </View>
+
+          {/* Download invoice — available once the order is delivered. */}
+          {order.status === "delivered" ? (
+            <Pressable
+              style={({ pressed }) => [styles.invoiceBtn, pressed && { opacity: 0.85 }]}
+              onPress={() => downloadInvoice(order.order_number)}
+              disabled={invoiceBusy}
+            >
+              {invoiceBusy ? (
+                <ActivityIndicator size="small" color="#b98421" />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={17} color="#b98421" />
+                  <Text style={styles.invoiceText}>Download invoice</Text>
+                </>
+              )}
+            </Pressable>
+          ) : null}
 
           {/* Actions — hidden once delivered (the celebration card carries
               Rate order / Reorder); shown for active orders to track + get help. */}
@@ -499,6 +539,8 @@ const styles = StyleSheet.create({
   billStrong: { fontFamily: fonts.bold, fontSize: 16 },
   billDivider: { height: 1, backgroundColor: colors.line, marginVertical: spacing(1) },
 
+  invoiceBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 50, borderRadius: 14, backgroundColor: colors.yellowTint, marginTop: spacing(2) },
+  invoiceText: { fontFamily: fonts.bold, fontSize: 15, color: "#b98421" },
   actions: { flexDirection: "row", gap: spacing(1.25), marginTop: spacing(2.5) },
   trackBtn: { flex: 1, height: 52, borderRadius: 14, backgroundColor: colors.green, alignItems: "center", justifyContent: "center" },
   trackText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },

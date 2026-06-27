@@ -113,18 +113,20 @@ export default function HomeScreen() {
           <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
         }
       >
-        {/* Dark header — deliver-to, avatar, search. */}
+        {/* Dark header — brand logo, avatar, search. */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.deliverLabel}>DELIVER TO</Text>
-              <View style={styles.deliverRow}>
-                <Text style={styles.deliverValue}>Home · 12 min</Text>
-                <Ionicons name="chevron-down" size={16} color={colors.white} />
-              </View>
+            {/* Brand logo on a light chip so the dark wordmark stays visible on
+                the dark header. */}
+            <View style={styles.logoChip}>
+              <Image source={require("../assets/milkkart-logo.png")} style={styles.logo} resizeMode="contain" />
             </View>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
+              {user?.avatar ? (
+                <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.avatarText}>{initial}</Text>
+              )}
             </View>
           </View>
 
@@ -286,9 +288,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing(2.5),
   },
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  deliverLabel: { fontFamily: fontsAlt.extrabold, fontSize: 10, letterSpacing: 1, color: colors.green },
-  deliverRow: { flexDirection: "row", alignItems: "center", marginTop: 3 },
-  deliverValue: { fontFamily: fonts.bold, fontSize: 16, color: colors.white, marginRight: 4 },
+  logoChip: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    paddingHorizontal: spacing(1.25),
+    paddingVertical: spacing(0.75),
+  },
+  logo: { width: 88, height: 34 },
   avatar: {
     width: 38,
     height: 38,
@@ -296,8 +302,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.green,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   avatarText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
+  avatarImg: { width: "100%", height: "100%" },
   searchWrap: { marginTop: spacing(2) },
 
   // Content ------------------------------------------------------------------

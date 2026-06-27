@@ -186,6 +186,24 @@ export type OrderDetail = {
   updated_at: string;
 };
 
+export type Invoice = {
+  id: number;
+  number: string;
+  order_number: string;
+  order_status: string;
+  subtotal: string;
+  discount: string;
+  delivery_fee: string;
+  small_cart_fee: string;
+  tax: string;
+  total: string;
+  address_snapshot: string;
+  items: OrderItemDetail[];
+  placed_at: string;
+  issued_at: string;
+  emailed_at: string | null;
+};
+
 export type OrderReview = {
   id: number;
   order_rating: number;
@@ -216,6 +234,11 @@ export type RiderDeliveryItem = {
 export type RiderDelivery = {
   order_number: string;
   address: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_avatar: string;
+  dest_lat: string | null;
+  dest_lng: string | null;
   total: string;
   status: string;
   type: "instant" | "subscription";
@@ -224,6 +247,17 @@ export type RiderDelivery = {
   item_count: number;
   item_images: string[];
   items: RiderDeliveryItem[];
+  // Present on history-list rows: the day it counts against (delivered/assigned),
+  // as a YYYY-MM-DD string, plus the full ISO timestamp. Null if never stamped.
+  date?: string | null;
+  at?: string | null;
+};
+
+export type RiderDeliveryKind = "delivered" | "pending" | "returned";
+
+export type RiderDeliveriesList = {
+  kind: RiderDeliveryKind;
+  deliveries: RiderDelivery[];
 };
 
 export type RiderDay = {
@@ -237,6 +271,8 @@ export type RiderDay = {
     rider_fee: string;
     cod_to_collect: string;
     cod_collected: string;
+    cod_collected_upi: string;
+    cod_collected_cash: string;
   };
   deliveries: RiderDelivery[];
 };
@@ -342,6 +378,9 @@ const rawBaseQuery = fetchBaseQuery({
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.access;
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    // When the backend is reached through an ngrok tunnel, skip its browser
+    // interstitial so API responses come back as JSON, not an HTML warning page.
+    headers.set("ngrok-skip-browser-warning", "1");
     return headers;
   },
 });
@@ -396,7 +435,7 @@ export const api = createApi({
       query: () => "/auth/me/",
       providesTags: ["Me"],
     }),
-    updateMe: build.mutation<User, { name?: string; email?: string }>({
+    updateMe: build.mutation<User, { name?: string; email?: string; avatar?: string }>({
       query: (body) => ({ url: "/auth/me/", method: "PATCH", body }),
       invalidatesTags: ["Me"],
     }),
@@ -464,6 +503,10 @@ export const api = createApi({
       query: (date) => `/rider/day/${date ? `?date=${date}` : ""}`,
       providesTags: ["RiderDay"],
     }),
+    riderDeliveries: build.query<RiderDeliveriesList, RiderDeliveryKind>({
+      query: (kind) => `/rider/deliveries/?kind=${kind}`,
+      providesTags: ["RiderDay"],
+    }),
     acceptOrder: build.mutation<unknown, string>({
       query: (orderNumber) => ({ url: `/rider/orders/${orderNumber}/accept/`, method: "POST" }),
       invalidatesTags: ["RiderDay"],
@@ -472,7 +515,7 @@ export const api = createApi({
       query: (orderNumber) => ({ url: `/rider/orders/${orderNumber}/pickup/`, method: "POST" }),
       invalidatesTags: ["RiderDay"],
     }),
-    deliverOrder: build.mutation<unknown, { orderNumber: string; otp: string; proof_photo?: string }>({
+    deliverOrder: build.mutation<unknown, { orderNumber: string; otp: string; proof_photo?: string; paid_via_upi?: boolean }>({
       query: ({ orderNumber, ...body }) => ({ url: `/rider/orders/${orderNumber}/deliver/`, method: "POST", body }),
       invalidatesTags: ["RiderDay"],
     }),
@@ -606,6 +649,9 @@ export const api = createApi({
     }),
     orderDetail: build.query<OrderDetail, string>({
       query: (orderNumber) => `/orders/${orderNumber}/`,
+    }),
+    invoiceForOrder: build.query<Invoice, string>({
+      query: (orderNumber) => `/invoices/${orderNumber}/`,
     }),
     initiatePayment: build.mutation<unknown, { order_number: string; method: string }>({
       query: (body) => ({ url: "/payments/initiate/", method: "POST", body }),
@@ -777,6 +823,7 @@ export const {
   useRiderDutyQuery,
   useSetRiderDutyMutation,
   useRiderDayQuery,
+  useRiderDeliveriesQuery,
   useAcceptOrderMutation,
   usePickupOrderMutation,
   useDeliverOrderMutation,
@@ -796,6 +843,7 @@ export const {
   useCheckoutMutation,
   useOrdersQuery,
   useOrderDetailQuery,
+  useLazyInvoiceForOrderQuery,
   useInitiatePaymentMutation,
   useWalletQuery,
   useWalletTopupMutation,

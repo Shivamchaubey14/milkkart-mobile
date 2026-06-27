@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RiderDelivery } from "../api/baseApi";
@@ -46,6 +46,9 @@ export function OrderItemsModal({ delivery, onClose }: { delivery: RiderDelivery
 
   const items = data?.items ?? [];
   const count = data?.item_count ?? items.length;
+  const custAvatar = imageUrl(data?.customer_avatar);
+  const custName = (data?.customer_name || "").trim();
+  const custInitial = (custName || data?.customer_phone || "?").trim()[0]?.toUpperCase() ?? "?";
 
   return (
     <Modal transparent visible={mounted} onRequestClose={onClose} animationType="none" statusBarTranslucent>
@@ -69,6 +72,33 @@ export function OrderItemsModal({ delivery, onClose }: { delivery: RiderDelivery
             <Ionicons name="close" size={18} color={colors.heading} />
           </Pressable>
         </View>
+
+        {/* Who ordered — customer avatar, name and a quick call action. */}
+        {data && (custName || data.customer_phone) ? (
+          <View style={styles.customer}>
+            <View style={styles.custAvatar}>
+              {custAvatar ? (
+                <Image source={{ uri: custAvatar }} style={styles.custAvatarImg} />
+              ) : (
+                <Text style={styles.custInitial}>{custInitial}</Text>
+              )}
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.custName} numberOfLines={1}>{custName || t("customer")}</Text>
+              {data.customer_phone ? (
+                <View style={styles.custPhoneRow}>
+                  <Ionicons name="call-outline" size={12} color={colors.muted} />
+                  <Text style={styles.custPhone} numberOfLines={1}>{data.customer_phone}</Text>
+                </View>
+              ) : null}
+            </View>
+            {data.customer_phone ? (
+              <Pressable style={styles.custCall} onPress={() => Linking.openURL(`tel:${data.customer_phone}`)} hitSlop={8}>
+                <Ionicons name="call" size={16} color={colors.green} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
           {items.map((it, i) => {
@@ -111,6 +141,32 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.bold, fontSize: 19, color: colors.heading },
   sub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, marginTop: 2 },
   close: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.bgSoft, alignItems: "center", justifyContent: "center" },
+
+  // Customer header
+  customer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1.5),
+    backgroundColor: colors.bgSoft,
+    borderRadius: 14,
+    padding: spacing(1.5),
+    marginBottom: spacing(1.5),
+  },
+  custAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.green,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  custAvatarImg: { width: "100%", height: "100%" },
+  custInitial: { fontFamily: fonts.bold, fontSize: 18, color: colors.white },
+  custName: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+  custPhoneRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
+  custPhone: { flexShrink: 1, fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted },
+  custCall: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
 
   list: { maxHeight: 380 },
   itemRow: {

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -18,10 +20,14 @@ import { DutyToggle } from "../components/DutyToggle";
 import { LanguagePicker } from "../components/LanguagePicker";
 import { NumberPlate } from "../components/NumberPlate";
 import { OrderItemsModal } from "../components/OrderItemsModal";
+import { PaymentSlipModal } from "../components/PaymentSlipModal";
 import { Screen } from "../components/Screen";
+import { StatusDot } from "../components/StatusDot";
 import { useToast } from "../components/Toast";
+import { UpiQrModal } from "../components/UpiQrModal";
 import { useT } from "../i18n/LanguageProvider";
 import type { TKey } from "../i18n/translations";
+import type { RiderHomeStackParamList } from "../navigation/RiderHomeStack";
 import { presentLocalAlert } from "../notifications/push";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -46,6 +52,7 @@ const STATUS_LABEL_KEY: Record<string, TKey> = {
 export default function RiderHomeScreen() {
   const toast = useToast();
   const t = useT();
+  const navigation = useNavigation<NativeStackNavigationProp<RiderHomeStackParamList>>();
   const { data: me } = useMeQuery();
   const { data: duty } = useRiderDutyQuery();
   const [setRiderDuty] = useSetRiderDutyMutation();
@@ -56,11 +63,28 @@ export default function RiderHomeScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [itemsFor, setItemsFor] = useState<RiderDelivery | null>(null);
   const [deliverFor, setDeliverFor] = useState<RiderDelivery | null>(null);
+  const [upiFor, setUpiFor] = useState<RiderDelivery | null>(null);
+  const [slipFor, setSlipFor] = useState<RiderDelivery | null>(null);
+  // Order whose COD was collected via the UPI QR — so the deliver call records it
+  // as UPI-collected (vs cash) and it shows in the COD summary.
+  const [upiPaidOrder, setUpiPaidOrder] = useState<string | null>(null);
   // Poll so a freshly-assigned order surfaces (and alerts) within ~20s without
   // the rider pulling to refresh.
-  const { data: day, isFetching, refetch } = useRiderDayQuery(dateISO(date), {
+  const { data: day, refetch } = useRiderDayQuery(dateISO(date), {
     pollingInterval: 20000,
   });
+
+  // Only show the pull-to-refresh spinner for a deliberate pull. The 20s
+  // background poll (and re-fetches) update the data silently — no auto spinner.
+  const [refreshing, setRefreshing] = useState(false);
+  const onPullRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // In-app alert path: when a brand-new "assigned" order appears, fire a local
   // notification + buzz so the rider is alerted even without remote push (works
@@ -143,7 +167,7 @@ export default function RiderHomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onPullRefresh} tintColor={colors.green} colors={[colors.green]} />
         }
       >
         {/* Rider identity + duty toggle */}
@@ -152,7 +176,11 @@ export default function RiderHomeScreen() {
           <View style={styles.riderTop}>
             <View style={styles.avatarCol}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initial}</Text>
+                {me?.avatar ? (
+                  <Image source={{ uri: me.avatar }} style={styles.avatarImg} />
+                ) : (
+                  <Text style={styles.avatarText}>{initial}</Text>
+                )}
               </View>
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={12} color={colors.yellow} />
@@ -180,13 +208,14 @@ export default function RiderHomeScreen() {
 
           <View style={styles.dutyRow}>
             <View style={styles.dutyTextWrap}>
-              <View style={styles.dutyLabelRow}>
-                <View style={[styles.statusDot, { backgroundColor: onDuty ? colors.green : "rgba(255,255,255,0.4)" }]} />
+              {/* Status dot — glows + blinks while on duty, static when off. */}
+              <StatusDot active={onDuty} color={onDuty ? colors.green : "rgba(255,255,255,0.4)"} />
+              <View style={styles.dutyTextCol}>
                 <Text style={styles.dutyLabel}>{onDuty ? t("onDuty") : t("offDuty")}</Text>
+                <Text style={styles.dutyHint}>
+                  {onDuty ? t("acceptingDeliveries") : t("notAcceptingDeliveries")}
+                </Text>
               </View>
-              <Text style={styles.dutyHint}>
-                {onDuty ? t("acceptingDeliveries") : t("notAcceptingDeliveries")}
-              </Text>
             </View>
             <DutyToggle value={onDuty} onChange={toggleDuty} />
           </View>
@@ -210,8 +239,33 @@ export default function RiderHomeScreen() {
           />
         ) : null}
         <View style={styles.statRow}>
-          <StatCard icon="checkmark-done" bg={colors.greenTint} fg={colors.green} value={String(stats?.delivered ?? 0)} label={t("delivered")} />
-          <StatCard icon="time-outline" bg={colors.yellowTint} fg="#b98421" value={String(stats?.pending ?? 0)} label={t("pending")} />
+          <StatCard
+            icon="checkmark-done"
+            bg={colors.greenTint}
+            fg={colors.green}
+            value={String(stats?.delivered ?? 0)}
+            label={t("delivered")}
+            onPress={() => navigation.navigate("RiderDeliveries", { kind: "delivered" })}
+          />
+          <StatCard
+            icon="time-outline"
+            bg={colors.yellowTint}
+            fg="#b98421"
+            value={String(stats?.pending ?? 0)}
+            label={t("pending")}
+            onPress={() => navigation.navigate("RiderDeliveries", { kind: "pending" })}
+          />
+          {/* Returned tile only when there is something returned (like the web). */}
+          {(stats?.returned ?? 0) > 0 ? (
+            <StatCard
+              icon="arrow-undo-outline"
+              bg="#fdecd9"
+              fg="#b46b00"
+              value={String(stats?.returned ?? 0)}
+              label={t("returned")}
+              onPress={() => navigation.navigate("RiderDeliveries", { kind: "returned" })}
+            />
+          ) : null}
           <StatCard icon="cash-outline" bg={colors.greenTint} fg={colors.green} value={money(stats?.earnings ?? 0)} label={t("earnings")} />
         </View>
 
@@ -228,13 +282,25 @@ export default function RiderHomeScreen() {
               <Text style={[styles.codAmount, { color: colors.white }]}>{money(stats?.cod_collected ?? 0)}</Text>
             </View>
           </View>
-          <Pressable style={styles.settleBtn} onPress={soon()}>
-            <Text style={styles.settleText}>{t("depositPending")}</Text>
-            <View style={styles.settleRight}>
-              <Text style={styles.settleAction}>{t("settle")}</Text>
-              <Ionicons name="arrow-forward" size={15} color={colors.white} />
+          {/* How the collected cash split between cash-in-hand and UPI QR
+              (paid straight to MilkKart). */}
+          <View style={styles.splitRow}>
+            <View style={styles.splitCol}>
+              <View style={styles.splitHead}>
+                <Ionicons name="cash-outline" size={14} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.splitLabel}>{t("cashLabel")}</Text>
+              </View>
+              <Text style={styles.splitAmount}>{money(stats?.cod_collected_cash ?? 0)}</Text>
             </View>
-          </Pressable>
+            <View style={styles.splitDivider} />
+            <View style={[styles.splitCol, styles.splitColRight]}>
+              <View style={styles.splitHead}>
+                <Ionicons name="qr-code-outline" size={14} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.splitLabel}>{t("upiLabel")}</Text>
+              </View>
+              <Text style={[styles.splitAmount, { color: colors.green }]}>{money(stats?.cod_collected_upi ?? 0)}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Active deliveries */}
@@ -262,8 +328,25 @@ export default function RiderHomeScreen() {
               <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginTop: 1 }} />
               <Text style={styles.fullAddress}>{current.address}</Text>
             </View>
+            {/* COD orders can be paid by UPI — show a QR for the order amount. */}
+            {current.is_cod ? (
+              <Pressable style={({ pressed }) => [styles.upiBtn, pressed && { opacity: 0.85 }]} onPress={() => setUpiFor(current)}>
+                <Ionicons name="qr-code-outline" size={16} color={colors.green} />
+                <Text style={styles.upiBtnText}>{t("collectViaUpi")}</Text>
+              </Pressable>
+            ) : null}
             <View style={styles.actionRow}>
-              <Pressable style={styles.navigateBtn} onPress={soon()}>
+              <Pressable
+                style={styles.navigateBtn}
+                onPress={() =>
+                  navigation.navigate("RiderNavigate", {
+                    orderNumber: current.order_number,
+                    address: current.address,
+                    destLat: current.dest_lat,
+                    destLng: current.dest_lng,
+                  })
+                }
+              >
                 <Ionicons name="navigate-outline" size={16} color={colors.green} />
                 <Text style={styles.navigateText}>{t("navigate")}</Text>
               </Pressable>
@@ -299,7 +382,37 @@ export default function RiderHomeScreen() {
       </ScrollView>
 
       <OrderItemsModal delivery={itemsFor} onClose={() => setItemsFor(null)} />
-      <DeliverModal delivery={deliverFor} onClose={() => setDeliverFor(null)} />
+      <DeliverModal
+        delivery={deliverFor}
+        paidViaUpi={!!deliverFor && deliverFor.order_number === upiPaidOrder}
+        onClose={() => {
+          if (deliverFor && deliverFor.order_number === upiPaidOrder) setUpiPaidOrder(null);
+          setDeliverFor(null);
+        }}
+      />
+      <UpiQrModal
+        delivery={upiFor}
+        onClose={() => setUpiFor(null)}
+        onPaid={() => {
+          const d = upiFor;
+          setUpiFor(null);
+          // Remember this order was paid via UPI so the deliver step records it.
+          if (d) setUpiPaidOrder(d.order_number);
+          // Generate the payment slip once the rider confirms payment. Stagger
+          // so the QR sheet finishes dismissing first (avoids overlapping modals).
+          if (d) setTimeout(() => setSlipFor(d), 280);
+        }}
+      />
+      <PaymentSlipModal
+        delivery={slipFor}
+        onClose={() => setSlipFor(null)}
+        onContinue={() => {
+          const d = slipFor;
+          setSlipFor(null);
+          // Continue to the OTP / confirm-delivery sheet after the slip.
+          if (d) setTimeout(() => setDeliverFor(d), 280);
+        }}
+      />
     </Screen>
   );
 }
@@ -368,25 +481,30 @@ function StatCard({
   fg,
   value,
   label,
+  onPress,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   bg: string;
   fg: string;
   value: string;
   label: string;
+  // When set, the card becomes tappable (opens that status' history list).
+  onPress?: () => void;
 }) {
+  const Container: any = onPress ? Pressable : View;
   return (
-    <View style={[styles.statCard, { backgroundColor: bg }]}>
-      <View style={styles.statTop}>
-        {/* Icon is absolutely pinned to the left so the value can use the full
-            card width and stays centered — same fixed size across all cards. */}
-        <Ionicons name={icon} size={17} color={fg} style={styles.statIcon} />
-        <Text style={styles.statValue} numberOfLines={1}>
-          {value}
-        </Text>
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    <Container
+      style={({ pressed }: { pressed?: boolean }) => [styles.statCard, { backgroundColor: bg }, pressed && { opacity: 0.85 }]}
+      onPress={onPress}
+    >
+      {/* Icon, value and label stacked vertically (centered) so the value never
+          overlaps the icon — even for wide values like earnings. */}
+      <Ionicons name={icon} size={18} color={fg} />
+      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {value}
+      </Text>
+      <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+    </Container>
   );
 }
 
@@ -398,8 +516,9 @@ const styles = StyleSheet.create({
   blob: { position: "absolute", top: -40, right: -28, width: 130, height: 130, borderRadius: 65, backgroundColor: "rgba(255,255,255,0.05)" },
   riderTop: { flexDirection: "row", alignItems: "flex-start" },
   avatarCol: { alignItems: "center" },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.green, alignItems: "center", justifyContent: "center" },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarText: { fontFamily: fonts.bold, fontSize: 20, color: colors.white },
+  avatarImg: { width: "100%", height: "100%" },
   ratingRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 6 },
   ratingText: { fontFamily: fonts.bold, fontSize: 13, color: colors.yellow },
   riderInfo: { flex: 1, marginLeft: spacing(1.5), paddingTop: 2 },
@@ -417,11 +536,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.25),
     paddingHorizontal: spacing(1.75),
   },
-  dutyTextWrap: { flex: 1 },
-  dutyLabelRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  dutyTextWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 9 },
+  dutyTextCol: { flex: 1 },
   dutyLabel: { fontFamily: fonts.bold, fontSize: 15, color: colors.white },
-  dutyHint: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2, marginLeft: 15 },
+  dutyHint: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2 },
 
   // Section headers
   sectionHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: spacing(2.75), marginBottom: spacing(1.25) },
@@ -433,11 +551,9 @@ const styles = StyleSheet.create({
 
   // Stat cards
   statRow: { flexDirection: "row", gap: spacing(1.25) },
-  statCard: { flex: 1, borderRadius: 16, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.25), alignItems: "center" },
-  statTop: { width: "100%", minHeight: 22, alignItems: "center", justifyContent: "center", position: "relative" },
-  statIcon: { position: "absolute", left: 0, top: "50%", marginTop: -8.5 },
-  statValue: { textAlign: "center", fontFamily: fonts.bold, fontSize: 12, color: colors.heading },
-  statLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 5, textAlign: "center" },
+  statCard: { flex: 1, borderRadius: 16, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1), alignItems: "center" },
+  statValue: { textAlign: "center", fontFamily: fonts.bold, fontSize: 16, color: colors.heading, marginTop: 6 },
+  statLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 4, textAlign: "center" },
 
   // Cash-on-delivery card
   codCard: { backgroundColor: colors.heading, borderRadius: 18, padding: spacing(2), marginTop: spacing(2.5), overflow: "hidden" },
@@ -449,10 +565,21 @@ const styles = StyleSheet.create({
   codColRight: { alignItems: "flex-end" },
   codColLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.6)" },
   codAmount: { fontFamily: fonts.bold, fontSize: 22, color: colors.yellow, marginTop: 3 },
-  settleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.green, borderRadius: 12, paddingVertical: spacing(1.5), paddingHorizontal: spacing(1.75), marginTop: spacing(2) },
-  settleText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.white },
-  settleRight: { flexDirection: "row", alignItems: "center", gap: 4 },
-  settleAction: { fontFamily: fonts.bold, fontSize: 14, color: colors.white },
+  splitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(1.75),
+    marginTop: spacing(2),
+  },
+  splitCol: { flex: 1 },
+  splitColRight: { alignItems: "flex-end" },
+  splitDivider: { width: 1, alignSelf: "stretch", backgroundColor: "rgba(255,255,255,0.12)", marginHorizontal: spacing(1.5) },
+  splitHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+  splitLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: "rgba(255,255,255,0.7)" },
+  splitAmount: { fontFamily: fonts.bold, fontSize: 17, color: colors.white, marginTop: 4 },
 
   // Current delivery
   currentCard: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1.5, borderColor: colors.green, padding: spacing(1.75) },
@@ -475,6 +602,8 @@ const styles = StyleSheet.create({
   deliveryName: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
   deliveryAddr: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   deliveryAmount: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading, marginLeft: spacing(1) },
+  upiBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, height: 44, borderRadius: 12, backgroundColor: colors.greenTint, marginTop: spacing(1.25) },
+  upiBtnText: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
   actionRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), marginTop: spacing(1.75) },
   navigateBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 44, borderRadius: 12, borderWidth: 1.5, borderColor: colors.green },
   navigateText: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
