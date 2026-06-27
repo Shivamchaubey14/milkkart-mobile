@@ -4,9 +4,11 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { useUpdateMeMutation, useWalletQuery } from "../api/baseApi";
+import { useRiderDeliveriesQuery, useRiderEarningsQuery, useUpdateMeMutation, useWalletQuery } from "../api/baseApi";
 import { Screen } from "../components/Screen";
 import { useToast } from "../components/Toast";
+import { useT } from "../i18n/LanguageProvider";
+import type { TKey } from "../i18n/translations";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { logout, setUser } from "../store/authSlice";
@@ -20,78 +22,56 @@ type MenuItem = {
   icon: IoniconName;
   tint: string;
   fg: string;
-  title: string;
-  subtitle: string;
-  badge?: string;
-  value?: string;
+  titleKey: TKey;
+  subKey: TKey;
+  badgeKey?: TKey;
 };
 
 const MENU: MenuItem[] = [
-  {
-    key: "profile",
-    icon: "location-outline",
-    tint: colors.greenTint,
-    fg: colors.green,
-    title: "Profile & addresses",
-    subtitle: "Personal info, saved addresses",
-  },
-  {
-    key: "orders",
-    icon: "receipt-outline",
-    tint: "#fff4d6",
-    fg: "#b98421",
-    title: "My Orders",
-    subtitle: "Track & reorder",
-  },
-  {
-    key: "subscriptions",
-    icon: "repeat-outline",
-    tint: colors.greenTint,
-    fg: colors.green,
-    title: "Subscriptions",
-    subtitle: "Daily milk & bread plans",
-    badge: "2 active",
-  },
-  {
-    key: "wallet",
-    icon: "card-outline",
-    tint: colors.lineSoft,
-    fg: colors.heading,
-    title: "Wallet",
-    subtitle: "Balance & transactions",
-  },
-  {
-    key: "support",
-    icon: "help-circle-outline",
-    tint: colors.lineSoft,
-    fg: colors.heading,
-    title: "Help & Support",
-    subtitle: "FAQs, chat with us",
-  },
+  { key: "profile", icon: "location-outline", tint: colors.greenTint, fg: colors.green, titleKey: "menuProfileTitle", subKey: "menuProfileSub" },
+  { key: "orders", icon: "receipt-outline", tint: "#fff4d6", fg: "#b98421", titleKey: "menuOrdersTitle", subKey: "menuOrdersSub" },
+  { key: "subscriptions", icon: "repeat-outline", tint: colors.greenTint, fg: colors.green, titleKey: "menuSubsTitle", subKey: "menuSubsSub", badgeKey: "subsActiveBadge" },
+  { key: "wallet", icon: "card-outline", tint: colors.lineSoft, fg: colors.heading, titleKey: "menuWalletTitle", subKey: "menuWalletSub" },
+  { key: "support", icon: "help-circle-outline", tint: colors.lineSoft, fg: colors.heading, titleKey: "menuSupportTitle", subKey: "menuSupportSub" },
 ];
 
-type RiderStat = { key: string; icon: IoniconName; tint: string; fg: string; title: string; value: string; valueColor: string };
-
-// Rider-only stat rows shown after "Profile & addresses" (mock values for now).
-const RIDER_STATS: RiderStat[] = [
-  { key: "delivered", icon: "checkmark-done-outline", tint: colors.greenTint, fg: colors.green, title: "Total Delivered", value: "128", valueColor: colors.heading },
-  { key: "pending", icon: "time-outline", tint: "#fff4d6", fg: "#b98421", title: "Total Pending", value: "4", valueColor: colors.heading },
-  { key: "earnings", icon: "cash-outline", tint: colors.greenTint, fg: colors.green, title: "Total Earnings", value: "₹12,480.00", valueColor: colors.green },
-  { key: "pendingSince", icon: "calendar-outline", tint: colors.lineSoft, fg: colors.heading, title: "Total Pending Since", value: "24 Jun", valueColor: colors.muted },
-];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const money = (n: number | string) => "₹" + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
 export default function ProfileScreen() {
   const user = useAppSelector((s) => s.auth.user);
   const dispatch = useAppDispatch();
   const toast = useToast();
+  const t = useT();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const isRider = !!user?.is_rider;
   // Riders see stat rows, not the wallet/orders menu — skip the wallet fetch.
   const { data: wallet, isFetching, refetch } = useWalletQuery(undefined, { skip: isRider });
+  // Rider stats come from the same endpoints as the home dashboard / earnings.
+  const { data: earnings } = useRiderEarningsQuery(undefined, { skip: !isRider });
+  const { data: pendingList } = useRiderDeliveriesQuery("pending", { skip: !isRider });
   const [updateMe, { isLoading: uploadingAvatar }] = useUpdateMeMutation();
   const menu = isRider ? MENU.filter((m) => m.key === "profile") : MENU;
 
   const initial = (user?.name?.trim()?.[0] || "U").toUpperCase();
+
+  // "Pending since" = the day the oldest still-active order was assigned (the
+  // list is newest-first, so the last row is the oldest).
+  const pendingDeliveries = pendingList?.deliveries ?? [];
+  const pendingSince = (() => {
+    const oldest = pendingDeliveries[pendingDeliveries.length - 1];
+    if (!oldest?.date) return "—";
+    const [, m, d] = oldest.date.split("-").map(Number);
+    return `${d} ${MONTHS[m - 1]}`;
+  })();
+
+  type StatRow = { key: string; icon: IoniconName; tint: string; fg: string; title: string; value: string; valueColor: string; onPress?: () => void };
+  const riderStats: StatRow[] = [
+    { key: "delivered", icon: "checkmark-done-outline", tint: colors.greenTint, fg: colors.green, title: t("totalDelivered"), value: String(earnings?.total_deliveries ?? 0), valueColor: colors.heading, onPress: () => navigation.navigate("RiderDeliveries", { kind: "delivered" }) },
+    { key: "pending", icon: "time-outline", tint: "#fff4d6", fg: "#b98421", title: t("totalPendingStat"), value: String(pendingDeliveries.length), valueColor: colors.heading, onPress: () => navigation.navigate("RiderDeliveries", { kind: "pending" }) },
+    { key: "earnings", icon: "cash-outline", tint: colors.greenTint, fg: colors.green, title: t("totalEarnings"), value: money(earnings?.total_earnings ?? 0), valueColor: colors.green, onPress: () => navigation.navigate("RiderEarnings") },
+    { key: "pendingSince", icon: "calendar-outline", tint: colors.lineSoft, fg: colors.heading, title: t("totalPendingSince"), value: pendingSince, valueColor: colors.muted },
+  ];
 
   // Pick a photo from the library, compress to a data URL and save it as the
   // profile picture (PATCH /auth/me/), then reflect it in the store.
@@ -99,7 +79,7 @@ export default function ProfileScreen() {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        toast("Photo access is needed to set a profile picture.", "info");
+        toast(t("avatarPermNeeded"), "info");
         return;
       }
       const r = await ImagePicker.launchImageLibraryAsync({
@@ -112,9 +92,9 @@ export default function ProfileScreen() {
       const dataUrl = `data:image/jpeg;base64,${r.assets[0].base64}`;
       const updated = await updateMe({ avatar: dataUrl }).unwrap();
       dispatch(setUser(updated));
-      toast("Profile picture updated.");
+      toast(t("avatarUpdated"));
     } catch (e) {
-      toast("Couldn't update the picture. Please try again.", "error");
+      toast(t("avatarFailed"), "error");
     }
   }
 
@@ -136,7 +116,7 @@ export default function ProfileScreen() {
         {/* Dark header — title + user identity. */}
         <View style={styles.header}>
           <View style={styles.blob} />
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>{t("profileTitle")}</Text>
 
           <View style={styles.userRow}>
             <Pressable style={styles.avatar} onPress={pickAvatar} disabled={uploadingAvatar}>
@@ -153,7 +133,7 @@ export default function ProfileScreen() {
             </Pressable>
             <View style={styles.userInfo}>
               <Text style={styles.userName} numberOfLines={2}>
-                {user?.name || "MilkKart user"}
+                {user?.name || t("milkkartUser")}
               </Text>
               <Text style={styles.userPhone}>{user?.phone || ""}</Text>
             </View>
@@ -172,45 +152,50 @@ export default function ProfileScreen() {
                 else if (m.key === "orders") navigation.navigate("Orders");
                 else if (m.key === "subscriptions") navigation.navigate("Subscriptions");
                 else if (m.key === "support") navigation.navigate("Support");
-                else toast(`${m.title} — coming soon.`);
+                else toast(t("comingSoon"));
               }}
             >
               <View style={[styles.itemIcon, { backgroundColor: m.tint }]}>
                 <Ionicons name={m.icon} size={20} color={m.fg} />
               </View>
               <View style={styles.itemText}>
-                <Text style={styles.itemTitle}>{m.title}</Text>
+                <Text style={styles.itemTitle}>{t(m.titleKey)}</Text>
                 <Text style={styles.itemSub} numberOfLines={1}>
-                  {m.subtitle}
+                  {t(m.subKey)}
                 </Text>
               </View>
-              {m.badge ? (
+              {m.badgeKey ? (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{m.badge}</Text>
+                  <Text style={styles.badgeText}>{t(m.badgeKey)}</Text>
                 </View>
               ) : null}
               {m.key === "wallet" && wallet ? (
                 <Text style={styles.value}>₹{Number(wallet.balance).toFixed(2)}</Text>
-              ) : m.value ? (
-                <Text style={styles.value}>{m.value}</Text>
               ) : null}
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
           ))}
 
-          {/* Rider stats — shown only for delivery partners. */}
+          {/* Rider stats — shown only for delivery partners. Delivered/Pending/
+              Earnings rows are tappable and open their detail screens. */}
           {isRider
-            ? RIDER_STATS.map((s) => (
-                <View key={s.key} style={styles.item}>
-                  <View style={[styles.itemIcon, { backgroundColor: s.tint }]}>
-                    <Ionicons name={s.icon} size={20} color={s.fg} />
-                  </View>
-                  <View style={styles.itemText}>
-                    <Text style={styles.itemTitle}>{s.title}</Text>
-                  </View>
-                  <Text style={[styles.statValue, { color: s.valueColor }]}>{s.value}</Text>
-                </View>
-              ))
+            ? riderStats.map((s) => {
+                const Row: any = s.onPress ? Pressable : View;
+                return (
+                  <Row key={s.key} style={styles.item} onPress={s.onPress}>
+                    <View style={[styles.itemIcon, { backgroundColor: s.tint }]}>
+                      <Ionicons name={s.icon} size={20} color={s.fg} />
+                    </View>
+                    <View style={styles.itemText}>
+                      <Text style={styles.itemTitle}>{s.title}</Text>
+                    </View>
+                    <Text style={[styles.statValue, { color: s.valueColor }]}>{s.value}</Text>
+                    {s.onPress ? (
+                      <Ionicons name="chevron-forward" size={18} color={colors.muted} style={{ marginLeft: spacing(0.75) }} />
+                    ) : null}
+                  </Row>
+                );
+              })
             : null}
 
           {/* Logout */}
@@ -218,7 +203,7 @@ export default function ProfileScreen() {
             <View style={[styles.itemIcon, { backgroundColor: colors.errorTint }]}>
               <Ionicons name="log-out-outline" size={20} color={colors.error} />
             </View>
-            <Text style={styles.logoutText}>Logout</Text>
+            <Text style={styles.logoutText}>{t("logout")}</Text>
           </Pressable>
         </View>
       </ScrollView>
