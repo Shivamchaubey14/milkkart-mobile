@@ -33,6 +33,15 @@ import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
+// Compact money for the tight stat card — drop paise, use k/L for big sums so
+// the value never gets shrunk to an unreadable size.
+const moneyCompact = (n: number | string) => {
+  const v = Number(n);
+  if (v >= 100000) return "₹" + (v / 100000).toFixed(v % 100000 ? 1 : 0).replace(/\.0$/, "") + "L";
+  if (v >= 1000) return "₹" + (v / 1000).toFixed(v % 1000 ? 1 : 0).replace(/\.0$/, "") + "k";
+  return "₹" + Math.round(v).toLocaleString("en-IN");
+};
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function fmtDay(d: Date) {
@@ -266,7 +275,14 @@ export default function RiderHomeScreen() {
               onPress={() => navigation.navigate("RiderDeliveries", { kind: "returned" })}
             />
           ) : null}
-          <StatCard icon="cash-outline" bg={colors.greenTint} fg={colors.green} value={money(stats?.earnings ?? 0)} label={t("earnings")} />
+          <StatCard
+            icon="cash-outline"
+            bg={colors.greenTint}
+            fg={colors.green}
+            value={moneyCompact(stats?.earnings ?? 0)}
+            label={t("earnings")}
+            onPress={() => navigation.navigate("RiderEarnings")}
+          />
         </View>
 
         {/* Cash on delivery */}

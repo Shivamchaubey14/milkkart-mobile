@@ -260,6 +260,25 @@ export type RiderDeliveriesList = {
   deliveries: RiderDelivery[];
 };
 
+export type RiderEarningsDaily = { date: string; deliveries: number; earnings: string };
+export type RiderEarningsProduct = {
+  product_name: string;
+  image_url: string;
+  qty: number;
+  deliveries: number;
+  earnings: string;
+};
+export type RiderEarnings = {
+  fee_per_delivery: string;
+  total_earnings: string;
+  total_deliveries: number;
+  // The day being inspected (defaults to today) and that day's figures.
+  date: string;
+  selected: { date: string; deliveries: number; earnings: string };
+  daily: RiderEarningsDaily[];
+  by_product: RiderEarningsProduct[];
+};
+
 export type RiderDay = {
   date: string;
   stats: {
@@ -505,6 +524,10 @@ export const api = createApi({
     }),
     riderDeliveries: build.query<RiderDeliveriesList, RiderDeliveryKind>({
       query: (kind) => `/rider/deliveries/?kind=${kind}`,
+      providesTags: ["RiderDay"],
+    }),
+    riderEarnings: build.query<RiderEarnings, string | undefined>({
+      query: (date) => `/rider/earnings/${date ? `?date=${date}` : ""}`,
       providesTags: ["RiderDay"],
     }),
     acceptOrder: build.mutation<unknown, string>({
@@ -824,6 +847,7 @@ export const {
   useSetRiderDutyMutation,
   useRiderDayQuery,
   useRiderDeliveriesQuery,
+  useRiderEarningsQuery,
   useAcceptOrderMutation,
   usePickupOrderMutation,
   useDeliverOrderMutation,
