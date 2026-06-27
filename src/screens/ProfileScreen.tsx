@@ -46,10 +46,23 @@ export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const isRider = !!user?.is_rider;
   // Riders see stat rows, not the wallet/orders menu — skip the wallet fetch.
-  const { data: wallet, isFetching, refetch } = useWalletQuery(undefined, { skip: isRider });
+  const { data: wallet, isFetching: walletFetching, refetch: refetchWallet } = useWalletQuery(undefined, { skip: isRider });
   // Rider stats come from the same endpoints as the home dashboard / earnings.
-  const { data: earnings } = useRiderEarningsQuery(undefined, { skip: !isRider });
-  const { data: pendingList } = useRiderDeliveriesQuery("pending", { skip: !isRider });
+  const { data: earnings, isFetching: earningsFetching, refetch: refetchEarnings } = useRiderEarningsQuery(undefined, { skip: !isRider });
+  const { data: pendingList, isFetching: pendingFetching, refetch: refetchPending } = useRiderDeliveriesQuery("pending", { skip: !isRider });
+
+  // Only refetch the queries that are actually running for this user — calling
+  // refetch on a skipped query throws "Cannot refetch a query that has not been
+  // started yet."
+  const isFetching = isRider ? earningsFetching || pendingFetching : walletFetching;
+  const onRefresh = () => {
+    if (isRider) {
+      refetchEarnings();
+      refetchPending();
+    } else {
+      refetchWallet();
+    }
+  };
   const [updateMe, { isLoading: uploadingAvatar }] = useUpdateMeMutation();
   const menu = isRider ? MENU.filter((m) => m.key === "profile") : MENU;
 
@@ -110,7 +123,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
+          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={colors.green} colors={[colors.green]} />
         }
       >
         {/* Dark header — title + user identity. */}
