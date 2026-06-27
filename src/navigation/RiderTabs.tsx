@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useUnreadCountQuery } from "../api/baseApi";
 import { useT } from "../i18n/LanguageProvider";
 import NotificationsScreen from "../screens/NotificationsScreen";
-import PlaceholderScreen from "../screens/PlaceholderScreen";
+import RiderDeliveriesScreen from "../screens/RiderDeliveriesScreen";
+import RiderEarningsScreen from "../screens/RiderEarningsScreen";
 import ProfileStack from "./ProfileStack";
 import RiderHomeStack from "./RiderHomeStack";
 import { colors, fonts, palette } from "../theme";
@@ -22,16 +24,28 @@ const TAB_ICONS: Record<string, [IoniconName, IoniconName]> = {
   Profile: ["person-outline", "person"],
 };
 
-// Placeholder tabs until their features land — kept as named components so the
-// tab labels/headers read correctly.
-const PendingTab = () => {
-  const t = useT();
-  return <PlaceholderScreen title={t("placeholderPending")} icon="time-outline" />;
-};
-const EarningsTab = () => {
-  const t = useT();
-  return <PlaceholderScreen title={t("placeholderEarnings")} icon="wallet-outline" />;
-};
+// The Pending tab is just the pending-deliveries list as its root.
+const PendingStack = createNativeStackNavigator();
+const PendingTab = () => (
+  <PendingStack.Navigator screenOptions={{ headerShown: false }}>
+    <PendingStack.Screen name="RiderDeliveries" component={RiderDeliveriesScreen} initialParams={{ kind: "pending" }} />
+  </PendingStack.Navigator>
+);
+
+// The Earnings tab roots at the earnings screen, with the delivered list pushable
+// from its "View delivered orders" link.
+const EarningsStack = createNativeStackNavigator();
+const EarningsTab = () => (
+  <EarningsStack.Navigator screenOptions={{ headerShown: false }}>
+    <EarningsStack.Screen name="RiderEarnings" component={RiderEarningsScreen} />
+    <EarningsStack.Screen
+      name="RiderDeliveries"
+      component={RiderDeliveriesScreen}
+      initialParams={{ kind: "delivered" }}
+      options={{ animation: "slide_from_right" }}
+    />
+  </EarningsStack.Navigator>
+);
 
 // Bottom tabs shown to delivery partners (is_rider). Same Cream-Yolk bar as the
 // customer app, but a rider-focused set: Home dashboard, Pending, Earnings, Profile.

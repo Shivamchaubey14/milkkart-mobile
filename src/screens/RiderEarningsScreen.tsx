@@ -65,9 +65,11 @@ export default function RiderEarningsScreen() {
   return (
     <Screen padded={false}>
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={colors.heading} />
-        </Pressable>
+        {navigation.canGoBack() ? (
+          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+            <Ionicons name="arrow-back" size={22} color={colors.heading} />
+          </Pressable>
+        ) : null}
         <Text style={styles.title}>{t("earnings")}</Text>
       </View>
 

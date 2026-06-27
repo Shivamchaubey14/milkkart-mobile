@@ -91,9 +91,11 @@ export default function RiderDeliveriesScreen() {
     <Screen padded={false}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={colors.heading} />
-        </Pressable>
+        {navigation.canGoBack() ? (
+          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+            <Ionicons name="arrow-back" size={22} color={colors.heading} />
+          </Pressable>
+        ) : null}
         <View style={styles.flex}>
           <Text style={styles.title}>{t(KIND_TITLE[kind])}</Text>
           {!isLoading ? (
