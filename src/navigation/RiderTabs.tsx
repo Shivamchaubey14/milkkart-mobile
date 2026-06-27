@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useUnreadCountQuery } from "../api/baseApi";
+import { useRiderDeliveriesQuery, useUnreadCountQuery } from "../api/baseApi";
 import { useT } from "../i18n/LanguageProvider";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import RiderDeliveriesScreen from "../screens/RiderDeliveriesScreen";
@@ -55,6 +55,10 @@ export default function RiderTabs() {
   const t = useT();
   const { data: unread } = useUnreadCountQuery();
   const unreadCount = unread?.unread_count ?? 0;
+  // Pending count badge — number of still-active deliveries (polled so a new
+  // assignment bumps it without reopening the tab).
+  const { data: pending } = useRiderDeliveriesQuery("pending", { pollingInterval: 20000 });
+  const pendingCount = pending?.deliveries.length ?? 0;
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -84,7 +88,20 @@ export default function RiderTabs() {
       })}
     >
       <Tab.Screen name="Home" component={RiderHomeStack} options={{ tabBarLabel: t("tabHome") }} />
-      <Tab.Screen name="Pending" component={PendingTab} options={{ tabBarLabel: t("tabPending") }} />
+      <Tab.Screen
+        name="Pending"
+        component={PendingTab}
+        options={{
+          tabBarLabel: t("tabPending"),
+          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.green,
+            color: colors.white,
+            fontFamily: fonts.bold,
+            fontSize: 10,
+          },
+        }}
+      />
       <Tab.Screen
         name="Alerts"
         component={NotificationsScreen}
