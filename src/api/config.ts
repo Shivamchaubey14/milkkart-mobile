@@ -20,7 +20,7 @@ import Constants from "expo-constants";
 // reach a LAN IP or auto-detect the Expo host. Point this at a tunnel/deploy of
 // the backend (currently an ngrok tunnel of :8000) and REBUILD if it changes.
 // In the Expo dev server this is ignored — the host is derived live instead.
-const PROD_API_ORIGIN = "https://b617-49-43-115-214.ngrok-free.app";
+const PROD_API_ORIGIN = "https://apolonia-unvouchsafed-joy.ngrok-free.dev";
 
 // The "host:port" the phone used to load the JS bundle from the Expo packager.
 // Covers SDK 49+ (expoConfig.hostUri), Expo Go (manifest2), and classic manifest.
