@@ -1,12 +1,16 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import AdminCatalogScreen from "../screens/admin/AdminCatalogScreen";
 import AdminHomeScreen from "../screens/admin/AdminHomeScreen";
 import AdminOrdersScreen from "../screens/admin/AdminOrdersScreen";
 import AdminPlaceholderScreen from "../screens/admin/AdminPlaceholderScreen";
+import AdminProductEditScreen from "../screens/admin/AdminProductEditScreen";
 
 export type AdminStackParamList = {
   AdminHome: undefined;
   AdminOrders: undefined;
+  AdminCatalog: undefined;
+  AdminProductEdit: { productId?: number };
   AdminSection: { key: string; title: string };
 };
 
@@ -19,6 +23,8 @@ export default function AdminStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="AdminHome" component={AdminHomeScreen} />
       <Stack.Screen name="AdminOrders" component={AdminOrdersScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="AdminCatalog" component={AdminCatalogScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="AdminProductEdit" component={AdminProductEditScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AdminSection" component={AdminPlaceholderScreen} options={{ animation: "slide_from_right" }} />
     </Stack.Navigator>
   );

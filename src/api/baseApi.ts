@@ -428,6 +428,50 @@ export type AdminRider = {
   load: number;
 };
 
+export type AdminCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  is_active: boolean;
+  sort_order: number;
+  product_count: number;
+};
+
+export type AdminVariant = {
+  id: number;
+  label: string;
+  sku: string;
+  unit: string;
+  quantity_value: string;
+  fat_percent: string | null;
+  price: string;
+  mrp: string;
+  stock: number;
+  barcode: string;
+  is_default: boolean;
+  is_active: boolean;
+  discount_percent: number;
+  in_stock: boolean;
+};
+
+export type AdminProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  brand: string;
+  description: string;
+  image_url: string;
+  tags: string;
+  category: number;
+  category_name: string;
+  is_active: boolean;
+  variants: AdminVariant[];
+  variant_count: number;
+  total_stock: number;
+  created_at: string;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -477,7 +521,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -895,6 +939,56 @@ export const api = createApi({
       }),
       invalidatesTags: ["AdminOrder"],
     }),
+
+    // Catalog management (categories, products, variants)
+    adminCategories: build.query<AdminCategory[], void>({
+      query: () => "/admin/catalog/categories/",
+      providesTags: ["AdminCategory"],
+    }),
+    adminCreateCategory: build.mutation<AdminCategory, Partial<AdminCategory>>({
+      query: (body) => ({ url: "/admin/catalog/categories/", method: "POST", body }),
+      invalidatesTags: ["AdminCategory"],
+    }),
+    adminUpdateCategory: build.mutation<AdminCategory, { id: number } & Partial<AdminCategory>>({
+      query: ({ id, ...body }) => ({ url: `/admin/catalog/categories/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminCategory"],
+    }),
+    adminDeleteCategory: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/catalog/categories/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminCategory", "AdminProduct"],
+    }),
+    adminProducts: build.query<AdminProduct[], void>({
+      query: () => "/admin/catalog/products/",
+      providesTags: ["AdminProduct"],
+    }),
+    adminProduct: build.query<AdminProduct, number>({
+      query: (id) => `/admin/catalog/products/${id}/`,
+      providesTags: ["AdminProduct"],
+    }),
+    adminCreateProduct: build.mutation<AdminProduct, Partial<AdminProduct>>({
+      query: (body) => ({ url: "/admin/catalog/products/", method: "POST", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminUpdateProduct: build.mutation<AdminProduct, { id: number } & Partial<AdminProduct>>({
+      query: ({ id, ...body }) => ({ url: `/admin/catalog/products/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminDeleteProduct: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/catalog/products/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminCreateVariant: build.mutation<AdminVariant, { productId: number } & Partial<AdminVariant>>({
+      query: ({ productId, ...body }) => ({ url: `/admin/catalog/products/${productId}/variants/`, method: "POST", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminUpdateVariant: build.mutation<AdminVariant, { id: number } & Partial<AdminVariant>>({
+      query: ({ id, ...body }) => ({ url: `/admin/catalog/variants/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminDeleteVariant: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/catalog/variants/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminProduct"],
+    }),
   }),
 });
 
@@ -967,4 +1061,16 @@ export const {
   useAdminConfirmOrderMutation,
   useAdminCancelOrderMutation,
   useAdminAssignOrderMutation,
+  useAdminCategoriesQuery,
+  useAdminCreateCategoryMutation,
+  useAdminUpdateCategoryMutation,
+  useAdminDeleteCategoryMutation,
+  useAdminProductsQuery,
+  useAdminProductQuery,
+  useAdminCreateProductMutation,
+  useAdminUpdateProductMutation,
+  useAdminDeleteProductMutation,
+  useAdminCreateVariantMutation,
+  useAdminUpdateVariantMutation,
+  useAdminDeleteVariantMutation,
 } = api;
