@@ -175,7 +175,7 @@ function DeliveryCard({ d, onPress }: { d: RiderDelivery; onPress: () => void })
           ) : null}
           <View style={[styles.payPill, d.is_cod ? styles.payCod : styles.payPrepaid]}>
             <Text style={[styles.payText, d.is_cod ? styles.payTextCod : styles.payTextPrepaid]}>
-              {d.is_cod ? t("codShort") : t("prepaidShort")}
+              {d.is_cod ? t("codShort") : d.payment_label || t("prepaidShort")}
             </Text>
           </View>
           {d.delivery_type === "next_day" ? (

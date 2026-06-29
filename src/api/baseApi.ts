@@ -260,6 +260,9 @@ export type RiderDelivery = {
   delivery_type: "instant" | "next_day";
   delivery_date: string | null;
   is_cod: boolean;
+  /** Raw payment method (cod / online / wallet) + its display label ("Online"…). */
+  payment_method: string;
+  payment_label: string;
   cod_amount: string;
   item_count: number;
   item_images: string[];

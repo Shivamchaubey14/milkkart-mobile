@@ -340,7 +340,7 @@ export default function RiderHomeScreen() {
               <View style={styles.amountCol}>
                 <Text style={styles.deliveryAmount}>{money(current.total)}</Text>
                 <Text style={current.is_cod ? styles.collectCod : styles.collectPrepaid}>
-                  {current.is_cod ? t("collectCash") : t("prepaid")}
+                  {current.is_cod ? t("collectCash") : current.payment_label || t("prepaid")}
                 </Text>
               </View>
             </View>
@@ -501,7 +501,7 @@ function DeliveryRow({ d, onOpen }: { d: RiderDelivery; onOpen: () => void }) {
           <Text style={styles.deliveryName} numberOfLines={1}>{d.address}</Text>
           <View style={[styles.payPill, d.is_cod ? styles.payCod : styles.payPrepaid]}>
             <Text style={[styles.payText, d.is_cod ? styles.payTextCod : styles.payTextPrepaid]}>
-              {d.is_cod ? t("codShort") : t("prepaidShort")}
+              {d.is_cod ? t("codShort") : d.payment_label || t("prepaidShort")}
             </Text>
           </View>
         </View>
