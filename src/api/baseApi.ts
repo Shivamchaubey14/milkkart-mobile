@@ -188,6 +188,10 @@ export type OrderDetail = {
   total: string;
   coupon_code: string | null;
   address_snapshot: string;
+  delivery_type: "instant" | "next_day";
+  delivery_date: string | null;
+  /** Status driving the progress timeline (next-day auto-advances on its day). */
+  timeline_status: string;
   notes: string;
   items: OrderItemDetail[];
   assignment: OrderAssignment | null;
@@ -252,6 +256,9 @@ export type RiderDelivery = {
   total: string;
   status: string;
   type: "instant" | "subscription";
+  // Instant same-day vs a next-day pre-order, and its scheduled delivery date.
+  delivery_type: "instant" | "next_day";
+  delivery_date: string | null;
   is_cod: boolean;
   cod_amount: string;
   item_count: number;

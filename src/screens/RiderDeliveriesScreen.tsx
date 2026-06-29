@@ -52,6 +52,10 @@ function timeText(iso?: string | null) {
   return `${h}:${min} ${ampm}`;
 }
 
+// "YYYY-MM-DD" → "30 Jun" for the next-day delivery pill.
+const shortDay = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
 const STATUS_PILL: Record<string, { key: TKey; bg: string; fg: string }> = {
   delivered: { key: "statusDelivered", bg: colors.greenTint, fg: colors.green },
   returned: { key: "statusReturned", bg: colors.errorTint, fg: colors.error },
@@ -176,6 +180,13 @@ function DeliveryCard({ d, onPress }: { d: RiderDelivery; onPress: () => void })
               {d.is_cod ? t("codShort") : t("prepaidShort")}
             </Text>
           </View>
+          {d.delivery_type === "next_day" ? (
+            <View style={[styles.payPill, styles.nextDayPill]}>
+              <Text style={[styles.payText, styles.nextDayPillText]}>
+                {d.delivery_date ? `NEXT-DAY ${shortDay(d.delivery_date)}` : "NEXT-DAY"}
+              </Text>
+            </View>
+          ) : null}
           {d.at ? <Text style={styles.cardTime}>{timeText(d.at)}</Text> : null}
         </View>
       </View>
@@ -250,5 +261,7 @@ const styles = StyleSheet.create({
   payText: { fontFamily: fontsAlt.extrabold, fontSize: 9, letterSpacing: 0.5 },
   payTextCod: { color: "#b98421" },
   payTextPrepaid: { color: colors.green },
+  nextDayPill: { backgroundColor: "#e8f2fc" },
+  nextDayPillText: { color: colors.info },
   cardTime: { marginLeft: "auto", fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted },
 });

@@ -42,6 +42,10 @@ const moneyCompact = (n: number | string) => {
   return "₹" + Math.round(v).toLocaleString("en-IN");
 };
 
+// "YYYY-MM-DD" → "30 Jun" for the next-day delivery badge.
+const shortDay = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function fmtDay(d: Date) {
@@ -344,6 +348,14 @@ export default function RiderHomeScreen() {
               <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginTop: 1 }} />
               <Text style={styles.fullAddress}>{current.address}</Text>
             </View>
+            {current.delivery_type === "next_day" ? (
+              <View style={styles.nextDayChip}>
+                <Ionicons name="sunny-outline" size={13} color="#b98421" />
+                <Text style={styles.nextDayChipText}>
+                  Next-day{current.delivery_date ? ` · ${shortDay(current.delivery_date)}` : ""}
+                </Text>
+              </View>
+            ) : null}
             {/* COD orders can be paid by UPI — show a QR for the order amount. */}
             {current.is_cod ? (
               <Pressable style={({ pressed }) => [styles.upiBtn, pressed && { opacity: 0.85 }]} onPress={() => setUpiFor(current)}>
@@ -493,7 +505,10 @@ function DeliveryRow({ d, onOpen }: { d: RiderDelivery; onOpen: () => void }) {
             </Text>
           </View>
         </View>
-        <Text style={styles.deliveryAddr} numberOfLines={1}>#{d.order_number.slice(0, 8)}</Text>
+        <Text style={styles.deliveryAddr} numberOfLines={1}>
+          #{d.order_number.slice(0, 8)}
+          {d.delivery_type === "next_day" ? ` · Next-day${d.delivery_date ? ` ${shortDay(d.delivery_date)}` : ""}` : ""}
+        </Text>
       </View>
       <Text style={styles.deliveryAmount}>{money(d.total)}</Text>
     </View>
@@ -617,6 +632,18 @@ const styles = StyleSheet.create({
   collectPrepaid: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   addressRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing(1.5) },
   fullAddress: { flex: 1, fontFamily: fontsAlt.regular, fontSize: 13, color: colors.text, lineHeight: 19 },
+  nextDayChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    backgroundColor: "#fff4d6",
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    marginTop: spacing(1),
+  },
+  nextDayChipText: { fontFamily: fonts.bold, fontSize: 11, color: "#b98421" },
 
   // Product thumbnail stack (like My Orders)
   thumbs: { flexDirection: "row" },

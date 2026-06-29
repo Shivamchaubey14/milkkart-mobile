@@ -42,6 +42,19 @@ function fmtDate(iso: string) {
   return `${day} ${mon}, ${time}`;
 }
 
+// "YYYY-MM-DD" → "Tue, 30 Jun" for the next-day delivery date.
+function fmtDay(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+// Local calendar date as "YYYY-MM-DD" (string-comparable with delivery_date).
+function localToday() {
+  const n = new Date();
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
+}
+
 function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -95,7 +108,22 @@ export default function OrderDetailScreen() {
   // Returned orders show "Returned" as the final step (only then); otherwise the
   // normal 4-step path. The returned step sits at index 3 and is the active one.
   const STEPS = returned ? ["Confirmed", "Packed", "On the way", "Returned"] : BASE_STEPS;
-  const step = returned ? 3 : STEP_INDEX[order.status] ?? 0;
+  // A next-day pre-order that no operator has advanced yet progresses by date:
+  // "Confirmed" is ticked the moment it's placed, and "Packed" ticks on its
+  // delivery day. We mark only the milestones reached (the next one stays an
+  // empty/pending node — no pulsing "active" dot) so it reads as "waiting".
+  const nextDayPreorder = order.delivery_type === "next_day" && order.status === "pending";
+  let step: number;
+  let suppressActive = false;
+  if (returned) {
+    step = 3;
+  } else if (nextDayPreorder) {
+    const arrived = !!order.delivery_date && order.delivery_date <= localToday();
+    step = arrived ? 2 : 1; // 1 → Confirmed ticked; 2 → Packed ticked (on the day)
+    suppressActive = true;
+  } else {
+    step = STEP_INDEX[order.status] ?? 0;
+  }
   const tracking = order.status === "out_for_delivery";
   const rider = order.assignment;
 
@@ -185,6 +213,9 @@ export default function OrderDetailScreen() {
                   {STEPS.map((label, i) => {
                     const done = i < step;
                     const active = i === step;
+                    // For next-day pre-orders we don't highlight a "current" node —
+                    // only the reached milestones tick, the rest stay pending.
+                    const activeShown = active && !suppressActive;
                     const isFirst = i === 0;
                     const isLast = i === STEPS.length - 1;
                     const isReturnStep = returned && isLast;
@@ -208,8 +239,8 @@ export default function OrderDetailScreen() {
                           <View
                             style={[
                               styles.node,
-                              (done || active) && styles.nodeDone,
-                              active && styles.nodeActive,
+                              (done || activeShown) && styles.nodeDone,
+                              activeShown && styles.nodeActive,
                               isReturnStep && active && styles.nodeReturned,
                             ]}
                           >
@@ -218,7 +249,7 @@ export default function OrderDetailScreen() {
                             ) : done || isDeliveredStep ? (
                               <Ionicons name="checkmark" size={13} color={colors.white} />
                             ) : (
-                              <View style={[styles.nodeInner, active && styles.nodeInnerActive]} />
+                              <View style={[styles.nodeInner, activeShown && styles.nodeInnerActive]} />
                             )}
                           </View>
                           {!isLast ? <View style={[styles.line, i < step && styles.lineDone]} /> : null}
@@ -229,7 +260,7 @@ export default function OrderDetailScreen() {
                             styles.stepLabel,
                             isFirst && styles.stepLabelFirst,
                             isLast && styles.stepLabelLast,
-                            (done || active) && styles.stepLabelDone,
+                            (done || activeShown) && styles.stepLabelDone,
                             isReturnStep && active && styles.stepLabelReturned,
                           ]}
                         >
@@ -290,6 +321,23 @@ export default function OrderDetailScreen() {
           {order.items.map((it, i) => (
             <ItemRow key={it.id} item={it} tint={TINTS[i % TINTS.length]} />
           ))}
+
+          {/* Delivery timing */}
+          <Text style={styles.secLabel}>DELIVERY</Text>
+          <View style={styles.deliveryCard}>
+            <View style={styles.deliveryIcon}>
+              <Ionicons
+                name={order.delivery_type === "next_day" ? "sunny-outline" : "flash"}
+                size={16}
+                color={colors.green}
+              />
+            </View>
+            <Text style={styles.deliveryText}>
+              {order.delivery_type === "next_day"
+                ? `Next-day delivery${order.delivery_date ? ` · ${fmtDay(order.delivery_date)}` : ""}`
+                : "Instant delivery"}
+            </Text>
+          </View>
 
           {/* Address */}
           <Text style={styles.secLabel}>DELIVERY ADDRESS</Text>
@@ -527,6 +575,10 @@ const styles = StyleSheet.create({
   itemName: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
   itemMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   itemPrice: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
+
+  deliveryCard: { flexDirection: "row", gap: spacing(1.25), alignItems: "center", backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75) },
+  deliveryIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
+  deliveryText: { flex: 1, fontFamily: fonts.semibold, fontSize: 13, color: colors.heading },
 
   addrCard: { flexDirection: "row", gap: spacing(1.25), alignItems: "center", backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75) },
   addrIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
