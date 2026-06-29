@@ -500,6 +500,40 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Subscriptions admin (apps/subscriptions)
+export type ForecastSku = { variant_id: number; sku: string; product: string; label: string; units: number; stops: number; value: string };
+export type ForecastStop = {
+  customer_name: string;
+  customer_phone: string;
+  address: string;
+  city: string;
+  pincode: string;
+  product: string;
+  label: string;
+  quantity: number;
+  preferred_time: string | null;
+};
+export type SubscriptionForecast = {
+  date: string;
+  total_units: number;
+  total_stops: number;
+  total_value: string;
+  by_sku: ForecastSku[];
+  stops: ForecastStop[];
+};
+export type AdminVacation = {
+  subscription_id: number;
+  vacation_id: number;
+  customer_name: string;
+  customer_phone: string;
+  product: string;
+  label: string;
+  start_date: string;
+  end_date: string;
+  active: boolean;
+};
+export type VacationsReport = { date: string; count: number; vacations: AdminVacation[] };
+
 // Store settings (apps/core StoreConfig)
 export type StoreSettings = {
   free_delivery_threshold: string;
@@ -1192,6 +1226,14 @@ export const api = createApi({
       query: (body) => ({ url: "/admin/settings/", method: "PUT", body }),
       invalidatesTags: ["AdminSettings"],
     }),
+
+    // Subscriptions — demand forecast + route sheet, and active vacations
+    adminSubscriptionForecast: build.query<SubscriptionForecast, string | void>({
+      query: (date) => `/admin/subscriptions/forecast/${date ? `?date=${date}` : ""}`,
+    }),
+    adminSubscriptionVacations: build.query<VacationsReport, void>({
+      query: () => "/admin/subscriptions/vacations/",
+    }),
   }),
 });
 
@@ -1297,4 +1339,6 @@ export const {
   useAdminDeleteBannerMutation,
   useAdminSettingsQuery,
   useAdminUpdateSettingsMutation,
+  useAdminSubscriptionForecastQuery,
+  useAdminSubscriptionVacationsQuery,
 } = api;
