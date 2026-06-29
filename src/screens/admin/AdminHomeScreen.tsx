@@ -36,6 +36,7 @@ export default function AdminHomeScreen() {
   const open = (s: (typeof SECTIONS)[number]) => {
     if (s.key === "orders") navigation.navigate("AdminOrders");
     else if (s.key === "catalog") navigation.navigate("AdminCatalog");
+    else if (s.key === "dashboard") navigation.navigate("AdminDashboard");
     else navigation.navigate("AdminSection", { key: s.key, title: s.title });
   };
 

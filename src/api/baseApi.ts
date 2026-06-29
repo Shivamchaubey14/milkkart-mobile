@@ -472,6 +472,21 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Dashboard reports (apps/reports)
+export type DateRange = { start: string; end: string };
+export type SalesReport = { start: string; end: string; orders: number; revenue: string; average_order_value: string };
+export type OrderStatusReport = Record<string, number>;
+export type TopProduct = { product_name: string; quantity: number; revenue: string };
+export type SubscriptionReport = {
+  active: number;
+  paused: number;
+  cancelled: number;
+  total: number;
+  new_in_period: number;
+  cancelled_in_period: number;
+};
+export type RiderPerf = { rider: string; assignments: number; delivered: number; avg_rider_rating: number | null };
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -989,6 +1004,23 @@ export const api = createApi({
       query: (id) => ({ url: `/admin/catalog/variants/${id}/`, method: "DELETE" }),
       invalidatesTags: ["AdminProduct"],
     }),
+
+    // Dashboard reports (read-only, parameterised by a date range)
+    adminSales: build.query<SalesReport, DateRange>({
+      query: ({ start, end }) => `/reports/sales/?start=${start}&end=${end}`,
+    }),
+    adminOrderStatus: build.query<OrderStatusReport, DateRange>({
+      query: ({ start, end }) => `/reports/order-status/?start=${start}&end=${end}`,
+    }),
+    adminTopProducts: build.query<TopProduct[], DateRange & { limit?: number }>({
+      query: ({ start, end, limit = 8 }) => `/reports/top-products/?start=${start}&end=${end}&limit=${limit}`,
+    }),
+    adminSubscriptionReport: build.query<SubscriptionReport, DateRange>({
+      query: ({ start, end }) => `/reports/subscriptions/?start=${start}&end=${end}`,
+    }),
+    adminRiderReport: build.query<RiderPerf[], DateRange>({
+      query: ({ start, end }) => `/reports/riders/?start=${start}&end=${end}`,
+    }),
   }),
 });
 
@@ -1073,4 +1105,9 @@ export const {
   useAdminCreateVariantMutation,
   useAdminUpdateVariantMutation,
   useAdminDeleteVariantMutation,
+  useAdminSalesQuery,
+  useAdminOrderStatusQuery,
+  useAdminTopProductsQuery,
+  useAdminSubscriptionReportQuery,
+  useAdminRiderReportQuery,
 } = api;
