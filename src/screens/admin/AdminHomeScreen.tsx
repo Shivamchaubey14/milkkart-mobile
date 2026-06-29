@@ -37,6 +37,7 @@ export default function AdminHomeScreen() {
     if (s.key === "orders") navigation.navigate("AdminOrders");
     else if (s.key === "catalog") navigation.navigate("AdminCatalog");
     else if (s.key === "dashboard") navigation.navigate("AdminDashboard");
+    else if (s.key === "inventory") navigation.navigate("AdminInventory");
     else navigation.navigate("AdminSection", { key: s.key, title: s.title });
   };
 

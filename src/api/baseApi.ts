@@ -494,6 +494,23 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Inventory (apps/inventory)
+export type LowStockItem = { variant_id: number; sku: string; product_name: string; label: string; stock: number };
+export type LowStockReport = { threshold: number; count: number; variants: LowStockItem[] };
+export type StockMovement = {
+  id: number;
+  variant: number;
+  sku: string;
+  product_name: string;
+  delta: number;
+  reason: string;
+  balance_after: number;
+  note: string;
+  order_number: string | null;
+  created_by_phone: string | null;
+  created_at: string;
+};
+
 // Dashboard reports (apps/reports)
 export type DateRange = { start: string; end: string };
 export type SalesReport = { start: string; end: string; orders: number; revenue: string; average_order_value: string };
@@ -558,7 +575,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -1053,6 +1070,25 @@ export const api = createApi({
     adminRiderReport: build.query<RiderPerf[], DateRange>({
       query: ({ start, end }) => `/reports/riders/?start=${start}&end=${end}`,
     }),
+
+    // Inventory (low-stock, movements, restock/adjust)
+    adminLowStock: build.query<LowStockReport, number | void>({
+      query: (threshold) => `/inventory/low-stock/${threshold ? `?threshold=${threshold}` : ""}`,
+      providesTags: ["AdminInventory"],
+    }),
+    adminMovements: build.query<StockMovement[], void>({
+      query: () => "/inventory/movements/",
+      transformResponse: (r: StockMovement[] | Paginated<StockMovement>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminInventory"],
+    }),
+    adminRestock: build.mutation<StockMovement, { variant_id: number; quantity: number; note?: string }>({
+      query: (body) => ({ url: "/inventory/restock/", method: "POST", body }),
+      invalidatesTags: ["AdminInventory", "AdminProduct"],
+    }),
+    adminAdjustStock: build.mutation<StockMovement, { variant_id: number; delta: number; reason: string; note?: string }>({
+      query: (body) => ({ url: "/inventory/adjust/", method: "POST", body }),
+      invalidatesTags: ["AdminInventory", "AdminProduct"],
+    }),
   }),
 });
 
@@ -1143,4 +1179,8 @@ export const {
   useAdminTopProductsQuery,
   useAdminSubscriptionReportQuery,
   useAdminRiderReportQuery,
+  useAdminLowStockQuery,
+  useAdminMovementsQuery,
+  useAdminRestockMutation,
+  useAdminAdjustStockMutation,
 } = api;
