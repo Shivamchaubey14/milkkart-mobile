@@ -8,8 +8,12 @@ import LoginScreen from "../screens/auth/LoginScreen";
 import ProductScreen from "../screens/ProductScreen";
 import SplashScreen from "../screens/SplashScreen";
 import { useAppSelector } from "../store/hooks";
+import AdminStack from "./AdminStack";
 import MainTabs from "./MainTabs";
 import RiderTabs from "./RiderTabs";
+
+// Back-office roles get routed into the admin area instead of the storefront.
+const STAFF_ROLES = ["admin", "ops", "warehouse", "support"];
 
 export type RootStackParamList = {
   Main: undefined;
@@ -30,6 +34,8 @@ export default function RootNavigator() {
     return <SplashScreen />;
   }
   const isRider = !!me?.is_rider;
+  const isStaff = !!me?.role && STAFF_ROLES.includes(me.role);
+  const HomeComponent = isStaff ? AdminStack : isRider ? RiderTabs : MainTabs;
 
   return (
     <NavigationContainer>
@@ -38,7 +44,7 @@ export default function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {access ? (
           <>
-            <Stack.Screen name="Main" component={isRider ? RiderTabs : MainTabs} />
+            <Stack.Screen name="Main" component={HomeComponent} />
             {/* Full-screen (over the tabs) so the keyboard avoidance on the
                 review form isn't fighting the bottom tab bar. */}
             <Stack.Screen

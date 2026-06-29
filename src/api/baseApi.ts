@@ -407,6 +407,27 @@ export type NotificationPreferences = {
   updated_at: string;
 };
 
+// ---- Back-office (admin/ops) shapes — see apps/orders/admin_serializers ----
+export type AdminOrder = {
+  order_number: string;
+  status: string;
+  total: string;
+  customer_phone: string;
+  customer_name: string;
+  address_snapshot: string;
+  item_count: number;
+  placed_at: string;
+  rider: { rider_id: number; phone: string; vehicle_number: string; status: string } | null;
+};
+
+export type AdminRider = {
+  id: number;
+  phone: string;
+  name: string;
+  is_on_duty: boolean;
+  load: number;
+};
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -456,7 +477,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -849,6 +870,31 @@ export const api = createApi({
     registerDevice: build.mutation<unknown, { token: string; platform: string }>({
       query: (body) => ({ url: "/notifications/devices/", method: "POST", body }),
     }),
+
+    // ---- Back-office (admin/ops) — gated server-side by staff-role perms -----
+    adminOrders: build.query<AdminOrder[], { status?: string } | void>({
+      query: (arg) => `/admin/orders/${arg?.status ? `?status=${arg.status}` : ""}`,
+      providesTags: ["AdminOrder"],
+    }),
+    adminRiders: build.query<AdminRider[], void>({
+      query: () => "/admin/riders/",
+    }),
+    adminConfirmOrder: build.mutation<unknown, string>({
+      query: (orderNumber) => ({ url: `/admin/orders/${orderNumber}/confirm/`, method: "POST" }),
+      invalidatesTags: ["AdminOrder"],
+    }),
+    adminCancelOrder: build.mutation<unknown, string>({
+      query: (orderNumber) => ({ url: `/admin/orders/${orderNumber}/cancel/`, method: "POST" }),
+      invalidatesTags: ["AdminOrder"],
+    }),
+    adminAssignOrder: build.mutation<unknown, { orderNumber: string; rider_id?: number }>({
+      query: ({ orderNumber, rider_id }) => ({
+        url: `/admin/orders/${orderNumber}/assign/`,
+        method: "POST",
+        body: rider_id ? { rider_id } : {},
+      }),
+      invalidatesTags: ["AdminOrder"],
+    }),
   }),
 });
 
@@ -916,4 +962,9 @@ export const {
   useNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
   useRegisterDeviceMutation,
+  useAdminOrdersQuery,
+  useAdminRidersQuery,
+  useAdminConfirmOrderMutation,
+  useAdminCancelOrderMutation,
+  useAdminAssignOrderMutation,
 } = api;
