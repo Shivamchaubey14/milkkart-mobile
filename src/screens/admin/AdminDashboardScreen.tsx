@@ -10,6 +10,7 @@ import {
   useAdminSubscriptionReportQuery,
   useAdminTopProductsQuery,
 } from "../../api/baseApi";
+import { AnimatedBar, DonutChart } from "../../components/Charts";
 import { Screen } from "../../components/Screen";
 import { ListSkeleton } from "../../components/Skeleton";
 import { colors, fonts, fontsAlt, spacing } from "../../theme";
@@ -70,7 +71,12 @@ export default function AdminDashboardScreen() {
   };
 
   const statusRows = Object.entries(status.data ?? {}).sort((a, b) => b[1] - a[1]);
-  const statusMax = Math.max(1, ...statusRows.map(([, v]) => v));
+  const statusTotal = statusRows.reduce((sum, [, v]) => sum + v, 0);
+  const statusSegments = statusRows.map(([k, v]) => ({
+    value: v,
+    color: STATUS_COLOR[k] || colors.green,
+    label: STATUS_LABEL[k] || k,
+  }));
   const topMax = Math.max(1, ...(top.data ?? []).map((t) => t.quantity));
 
   return (
@@ -121,15 +127,7 @@ export default function AdminDashboardScreen() {
             {statusRows.length === 0 ? (
               <Text style={styles.empty}>No orders in this range.</Text>
             ) : (
-              statusRows.map(([k, v]) => (
-                <View key={k} style={styles.barRow}>
-                  <Text style={styles.barLabel}>{STATUS_LABEL[k] || k}</Text>
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { width: `${(v / statusMax) * 100}%`, backgroundColor: STATUS_COLOR[k] || colors.green }]} />
-                  </View>
-                  <Text style={styles.barValue}>{v}</Text>
-                </View>
-              ))
+              <DonutChart segments={statusSegments} centerValue={String(statusTotal)} centerLabel="orders" />
             )}
           </View>
 
@@ -144,8 +142,8 @@ export default function AdminDashboardScreen() {
                   <View style={styles.rank}><Text style={styles.rankText}>{i + 1}</Text></View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.prodName} numberOfLines={1}>{t.product_name}</Text>
-                    <View style={styles.prodBarTrack}>
-                      <View style={[styles.prodBarFill, { width: `${(t.quantity / topMax) * 100}%` }]} />
+                    <View style={{ marginTop: 5 }}>
+                      <AnimatedBar pct={(t.quantity / topMax) * 100} delay={i * 80} />
                     </View>
                   </View>
                   <View style={styles.prodMeta}>
@@ -238,18 +236,10 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75) },
   empty: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted },
 
-  barRow: { flexDirection: "row", alignItems: "center", paddingVertical: spacing(0.75) },
-  barLabel: { width: 110, fontFamily: fonts.semibold, fontSize: 12, color: colors.heading },
-  barTrack: { flex: 1, height: 10, borderRadius: 6, backgroundColor: colors.bgSoft, overflow: "hidden", marginHorizontal: spacing(1) },
-  barFill: { height: "100%", borderRadius: 6 },
-  barValue: { width: 32, textAlign: "right", fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
-
   prodRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), paddingVertical: spacing(1) },
   rank: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
   rankText: { fontFamily: fonts.bold, fontSize: 12, color: colors.green },
   prodName: { fontFamily: fonts.semibold, fontSize: 13, color: colors.heading },
-  prodBarTrack: { height: 6, borderRadius: 4, backgroundColor: colors.bgSoft, overflow: "hidden", marginTop: 5 },
-  prodBarFill: { height: "100%", borderRadius: 4, backgroundColor: colors.green },
   prodMeta: { alignItems: "flex-end" },
   prodUnits: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
   prodRevenue: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted, marginTop: 2 },
