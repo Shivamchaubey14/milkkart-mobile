@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   AdminOrder,
@@ -16,6 +17,15 @@ import { useToast } from "../../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2);
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const dayLabel = (d: Date) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+const today = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 const FILTERS: [string, string][] = [
   ["", "All"],
@@ -40,13 +50,34 @@ export default function AdminOrdersScreen() {
   const navigation = useNavigation();
   const toast = useToast();
   const [filter, setFilter] = useState("");
+  // Default to today's orders; the date range is editable via the calendar buttons.
+  const [start, setStart] = useState<Date>(today());
+  const [end, setEnd] = useState<Date>(today());
+  const [picker, setPicker] = useState<"start" | "end" | null>(null);
+  const isToday = iso(start) === iso(today()) && iso(end) === iso(today());
+
   const { data: orders, isLoading, isFetching, refetch } = useAdminOrdersQuery(
-    filter ? { status: filter } : undefined,
+    { status: filter || undefined, start: iso(start), end: iso(end) },
     { refetchOnMountOrArgChange: true },
   );
   const [confirmOrder] = useAdminConfirmOrderMutation();
   const [cancelOrder] = useAdminCancelOrderMutation();
   const [assignOrder] = useAdminAssignOrderMutation();
+
+  function onPick(e: DateTimePickerEvent, d?: Date) {
+    const which = picker;
+    setPicker(null); // Android dialog dismisses on selection
+    if (e.type !== "set" || !d) return;
+    const picked = new Date(d);
+    picked.setHours(0, 0, 0, 0);
+    if (which === "start") {
+      setStart(picked);
+      if (iso(picked) > iso(end)) setEnd(picked);
+    } else if (which === "end") {
+      setEnd(picked);
+      if (iso(picked) < iso(start)) setStart(picked);
+    }
+  }
 
   async function run(p: Promise<unknown>, ok: string) {
     try {
@@ -77,6 +108,44 @@ export default function AdminOrdersScreen() {
         </View>
       </View>
 
+      {/* Date filter — defaults to today; tap a calendar to change the range. */}
+      <View style={styles.dateBar}>
+        <Pressable style={styles.dateBtn} onPress={() => setPicker("start")}>
+          <View style={styles.calIcon}>
+            <Ionicons name="calendar-outline" size={16} color={colors.green} />
+          </View>
+          <View>
+            <Text style={styles.dateCaption}>From</Text>
+            <Text style={styles.dateValue}>{dayLabel(start)}</Text>
+          </View>
+        </Pressable>
+        <Pressable style={styles.dateBtn} onPress={() => setPicker("end")}>
+          <View style={styles.calIcon}>
+            <Ionicons name="calendar-outline" size={16} color={colors.green} />
+          </View>
+          <View>
+            <Text style={styles.dateCaption}>To</Text>
+            <Text style={styles.dateValue}>{dayLabel(end)}</Text>
+          </View>
+        </Pressable>
+        <Pressable
+          style={[styles.todayBtn, isToday && styles.todayBtnActive]}
+          onPress={() => { setStart(today()); setEnd(today()); }}
+        >
+          <Text style={[styles.todayText, isToday && styles.todayTextActive]}>Today</Text>
+        </Pressable>
+      </View>
+
+      {picker ? (
+        <DateTimePicker
+          value={picker === "start" ? start : end}
+          mode="date"
+          display={Platform.OS === "ios" ? "inline" : "calendar"}
+          maximumDate={today()}
+          onChange={onPick}
+        />
+      ) : null}
+
       <View style={styles.chipsWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {FILTERS.map(([val, label]) => {
@@ -106,7 +175,10 @@ export default function AdminOrdersScreen() {
                 <Ionicons name="receipt-outline" size={30} color={colors.green} />
               </View>
               <Text style={styles.emptyTitle}>No orders</Text>
-              <Text style={styles.emptySub}>{filter ? "Try a different filter." : "Orders will appear here."}</Text>
+              <Text style={styles.emptySub}>
+                {isToday ? "No orders today yet." : "No orders for the selected dates."}
+                {filter ? " Try a different status." : ""}
+              </Text>
             </View>
           ) : (
             orders.map((o) => {
@@ -185,7 +257,29 @@ const styles = StyleSheet.create({
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
   headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.white },
 
-  chipsWrap: { paddingTop: spacing(2) },
+  // Date filter — rounded-square calendar buttons
+  dateBar: { flexDirection: "row", alignItems: "stretch", gap: spacing(1), paddingHorizontal: spacing(2.5), paddingTop: spacing(2) },
+  dateBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1),
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    paddingVertical: spacing(1),
+    paddingHorizontal: spacing(1.25),
+  },
+  calIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
+  dateCaption: { fontFamily: fontsAlt.extrabold, fontSize: 9, letterSpacing: 0.8, color: colors.muted },
+  dateValue: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading, marginTop: 1 },
+  todayBtn: { borderRadius: 14, paddingHorizontal: spacing(1.75), alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line, backgroundColor: colors.bg },
+  todayBtnActive: { backgroundColor: colors.green, borderColor: colors.green },
+  todayText: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
+  todayTextActive: { color: colors.white },
+
+  chipsWrap: { paddingTop: spacing(1.5) },
   chips: { gap: spacing(1), paddingHorizontal: spacing(2.5) },
   chip: { paddingVertical: spacing(0.75), paddingHorizontal: spacing(2), borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.bg },
   chipActive: { backgroundColor: colors.green, borderColor: colors.green },

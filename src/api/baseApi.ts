@@ -931,8 +931,14 @@ export const api = createApi({
     }),
 
     // ---- Back-office (admin/ops) — gated server-side by staff-role perms -----
-    adminOrders: build.query<AdminOrder[], { status?: string } | void>({
-      query: (arg) => `/admin/orders/${arg?.status ? `?status=${arg.status}` : ""}`,
+    adminOrders: build.query<AdminOrder[], { status?: string; start?: string; end?: string } | void>({
+      query: (arg) => {
+        const p: string[] = [];
+        if (arg?.status) p.push(`status=${arg.status}`);
+        if (arg?.start) p.push(`start=${arg.start}`);
+        if (arg?.end) p.push(`end=${arg.end}`);
+        return `/admin/orders/${p.length ? `?${p.join("&")}` : ""}`;
+      },
       providesTags: ["AdminOrder"],
     }),
     adminRiders: build.query<AdminRider[], void>({
