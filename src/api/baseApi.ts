@@ -500,6 +500,34 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Serviceability admin (apps/serviceability)
+export type ServiceableArea = {
+  id: number;
+  pincode: string;
+  area_name: string;
+  city: string;
+  is_active: boolean;
+  delivery_eta_minutes: number | null;
+  center_lat: string | null;
+  center_lng: string | null;
+  radius_km: string | null;
+  has_geofence: boolean;
+  created_at: string;
+  updated_at: string;
+};
+export type DeliveryZone = {
+  id: number;
+  name: string;
+  city: string;
+  state: string;
+  polygon: { type: string; coordinates: unknown };
+  is_active: boolean;
+  delivery_eta_minutes: number | null;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+};
+
 // Subscriptions admin (apps/subscriptions)
 export type ForecastSku = { variant_id: number; sku: string; product: string; label: string; units: number; stops: number; value: string };
 export type ForecastStop = {
@@ -658,7 +686,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner", "AdminSettings"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner", "AdminSettings", "AdminArea", "AdminZone"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -1234,6 +1262,38 @@ export const api = createApi({
     adminSubscriptionVacations: build.query<VacationsReport, void>({
       query: () => "/admin/subscriptions/vacations/",
     }),
+
+    // Serviceability — pincode areas (CRUD) + map-drawn delivery zones (read/toggle)
+    adminAreas: build.query<ServiceableArea[], void>({
+      query: () => "/serviceability/areas/",
+      transformResponse: (r: ServiceableArea[] | Paginated<ServiceableArea>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminArea"],
+    }),
+    adminCreateArea: build.mutation<ServiceableArea, Partial<ServiceableArea>>({
+      query: (body) => ({ url: "/serviceability/areas/", method: "POST", body }),
+      invalidatesTags: ["AdminArea"],
+    }),
+    adminUpdateArea: build.mutation<ServiceableArea, { id: number } & Partial<ServiceableArea>>({
+      query: ({ id, ...body }) => ({ url: `/serviceability/areas/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminArea"],
+    }),
+    adminDeleteArea: build.mutation<void, number>({
+      query: (id) => ({ url: `/serviceability/areas/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminArea"],
+    }),
+    adminZones: build.query<DeliveryZone[], void>({
+      query: () => "/serviceability/zones/",
+      transformResponse: (r: DeliveryZone[] | Paginated<DeliveryZone>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminZone"],
+    }),
+    adminUpdateZone: build.mutation<DeliveryZone, { id: number } & Partial<DeliveryZone>>({
+      query: ({ id, ...body }) => ({ url: `/serviceability/zones/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminZone"],
+    }),
+    adminDeleteZone: build.mutation<void, number>({
+      query: (id) => ({ url: `/serviceability/zones/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminZone"],
+    }),
   }),
 });
 
@@ -1341,4 +1401,11 @@ export const {
   useAdminUpdateSettingsMutation,
   useAdminSubscriptionForecastQuery,
   useAdminSubscriptionVacationsQuery,
+  useAdminAreasQuery,
+  useAdminCreateAreaMutation,
+  useAdminUpdateAreaMutation,
+  useAdminDeleteAreaMutation,
+  useAdminZonesQuery,
+  useAdminUpdateZoneMutation,
+  useAdminDeleteZoneMutation,
 } = api;
