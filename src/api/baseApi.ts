@@ -133,6 +133,16 @@ export type ServiceabilityResult = {
   area: { name?: string; city?: string; delivery_eta_minutes: number | null } | null;
 };
 
+// Status of the next-day pre-order window (admin-configured). When `open`,
+// customers may place orders for `next_delivery_date`.
+export type OrderWindow = {
+  enabled: boolean;
+  open: boolean;
+  start: string; // "HH:MM"
+  end: string; // "HH:MM"
+  next_delivery_date: string | null;
+};
+
 export type OrderSummary = {
   id: number;
   order_number: string;
@@ -650,6 +660,9 @@ export const api = createApi({
     deliverySlots: build.query<DeliverySlot[], void>({
       query: () => "/orders/delivery-slots/",
     }),
+    orderWindow: build.query<OrderWindow, void>({
+      query: () => "/orders/window/",
+    }),
     serviceabilityCheck: build.query<
       ServiceabilityResult,
       { pincode?: string; lat?: number; lng?: number }
@@ -662,7 +675,10 @@ export const api = createApi({
         return `/serviceability/check/${p.length ? `?${p.join("&")}` : ""}`;
       },
     }),
-    checkout: build.mutation<{ order_number: string }, { address_id: number; delivery_slot_id?: number }>({
+    checkout: build.mutation<
+      { order_number: string },
+      { address_id: number; delivery_slot_id?: number; delivery_day?: "instant" | "next_day" }
+    >({
       query: (body) => ({ url: "/orders/checkout/", method: "POST", body }),
       invalidatesTags: ["Cart", "Order"],
     }),
@@ -863,6 +879,7 @@ export const {
   useApplyCouponMutation,
   useRemoveCouponMutation,
   useDeliverySlotsQuery,
+  useOrderWindowQuery,
   useServiceabilityCheckQuery,
   useCheckoutMutation,
   useOrdersQuery,
