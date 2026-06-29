@@ -79,6 +79,9 @@ export const colors = {
   info: "#3e92e5",
   infoTint: "#e8f2fc",
   rating: yellowScale[500], // stars, reviews
+  // Skeleton loaders — neutral base block + a lighter band that sweeps across it.
+  skeleton: "#e8ecef",
+  skeletonHi: "#f5f7f8",
 };
 
 // Full scales grouped, for when a component needs a specific step.

@@ -3,7 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   RefreshControl,
@@ -17,6 +16,7 @@ import { RiderDelivery, useRiderDeliveriesQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { OrderItemsModal } from "../components/OrderItemsModal";
 import { Screen } from "../components/Screen";
+import { ListSkeleton } from "../components/Skeleton";
 import { useT } from "../i18n/LanguageProvider";
 import type { TKey } from "../i18n/translations";
 import type { RiderHomeStackParamList } from "../navigation/RiderHomeStack";
@@ -111,9 +111,7 @@ export default function RiderDeliveriesScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.green} />
-        </View>
+        <ListSkeleton rows={6} />
       ) : (
         <SectionList
           sections={sections}

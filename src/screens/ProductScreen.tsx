@@ -37,6 +37,7 @@ import {
 } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
+import { ProductDetailSkeleton } from "../components/Skeleton";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
@@ -154,10 +155,8 @@ export default function ProductScreen() {
 
   if (isLoading || !product) {
     return (
-      <Screen>
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.green} />
-        </View>
+      <Screen padded={false}>
+        <ProductDetailSkeleton />
       </Screen>
     );
   }

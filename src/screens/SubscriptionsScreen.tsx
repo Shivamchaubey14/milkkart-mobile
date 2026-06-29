@@ -31,6 +31,7 @@ import {
   useWalletQuery,
 } from "../api/baseApi";
 import { Screen } from "../components/Screen";
+import { ListSkeleton } from "../components/Skeleton";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
 import { colors, fonts, fontsAlt, shadow, spacing } from "../theme";
@@ -214,7 +215,7 @@ export default function SubscriptionsScreen() {
           </View>
 
           {isLoading ? (
-            <ActivityIndicator color={colors.green} style={{ marginTop: spacing(3) }} />
+            <ListSkeleton rows={4} />
           ) : visible.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.emptyBadge}>

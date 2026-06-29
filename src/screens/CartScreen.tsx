@@ -3,7 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
-  ActivityIndicator,
   Dimensions,
   Image,
   Pressable,
@@ -27,6 +26,7 @@ import {
 } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
+import { ListSkeleton } from "../components/Skeleton";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { colors, fonts, fontsAlt, palette, spacing } from "../theme";
@@ -88,10 +88,8 @@ export default function CartScreen() {
 
   if (isLoading) {
     return (
-      <Screen>
-        <View style={styles.empty}>
-          <ActivityIndicator size="large" color={colors.green} />
-        </View>
+      <Screen padded={false}>
+        <ListSkeleton rows={4} />
       </Screen>
     );
   }

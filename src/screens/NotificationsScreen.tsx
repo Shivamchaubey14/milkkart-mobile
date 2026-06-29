@@ -25,6 +25,7 @@ import {
   useUpdateNotificationPreferencesMutation,
 } from "../api/baseApi";
 import { Screen } from "../components/Screen";
+import { ListSkeleton } from "../components/Skeleton";
 import { useT } from "../i18n/LanguageProvider";
 import type { TKey } from "../i18n/translations";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
@@ -117,9 +118,7 @@ export default function NotificationsScreen() {
         </View>
 
         {isLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.green} />
-          </View>
+          <ListSkeleton rows={6} />
         ) : list.length === 0 ? (
           <View style={styles.center}>
             <View style={styles.emptyBadge}>

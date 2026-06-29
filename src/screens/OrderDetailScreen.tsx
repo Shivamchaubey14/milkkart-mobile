@@ -10,6 +10,7 @@ import { DeliveredCelebration } from "../components/DeliveredCelebration";
 import { useInvoiceDownloader } from "../invoices/useInvoiceDownloader";
 import { NumberPlate } from "../components/NumberPlate";
 import { Screen } from "../components/Screen";
+import { DetailSkeleton } from "../components/Skeleton";
 import TrackingMap from "../components/TrackingMap";
 import { useToast } from "../components/Toast";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
@@ -95,10 +96,8 @@ export default function OrderDetailScreen() {
 
   if (isLoading || !order) {
     return (
-      <Screen>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.green} />
-        </View>
+      <Screen padded={false}>
+        <DetailSkeleton />
       </Screen>
     );
   }

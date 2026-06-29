@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   CatalogProduct,
@@ -18,6 +18,7 @@ import {
 import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
+import { ProductGridSkeleton, Skeleton } from "../components/Skeleton";
 import { SearchBar } from "../components/SearchBar";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
@@ -193,18 +194,24 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
           >
-            {catChips.map((c) => {
-              const active = c.id === activeCatId;
-              return (
-                <Pressable
-                  key={c.id ?? "all"}
-                  onPress={() => setActiveCatId(c.id)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.name}</Text>
-                </Pressable>
-              );
-            })}
+            {!categories ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} width={72} height={34} radius={999} />
+              ))
+            ) : (
+              catChips.map((c) => {
+                const active = c.id === activeCatId;
+                return (
+                  <Pressable
+                    key={c.id ?? "all"}
+                    onPress={() => setActiveCatId(c.id)}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.name}</Text>
+                  </Pressable>
+                );
+              })
+            )}
           </ScrollView>
 
           {/* Popular products / search results */}
@@ -212,7 +219,7 @@ export default function HomeScreen() {
             {query ? `Results for “${query}”` : "Popular Products"}
           </Text>
           {!products && isFetching ? (
-            <ActivityIndicator color={colors.green} style={{ marginTop: spacing(3) }} />
+            <ProductGridSkeleton />
           ) : products && products.length === 0 ? (
             <Text style={styles.empty}>
               {query ? `No products match “${query}”.` : "No products in this category yet."}
