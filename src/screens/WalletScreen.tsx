@@ -27,6 +27,7 @@ import {
 } from "../api/baseApi";
 import { GooglePayLogo, PaytmLogo, PhonePeLogo } from "../components/PaymentLogos";
 import { Screen } from "../components/Screen";
+import { ListRowSkeleton } from "../components/Skeleton";
 import { useToast } from "../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
@@ -274,7 +275,11 @@ export default function WalletScreen() {
           }
         >
           {isLoading ? (
-            <ActivityIndicator color={colors.green} style={{ marginTop: spacing(2) }} />
+            <>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <ListRowSkeleton key={i} thumb={false} />
+              ))}
+            </>
           ) : txns.length > 0 ? (
             txns.map((tx) => <TxnRow key={tx.id} tx={tx} />)
           ) : (

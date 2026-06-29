@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   CatalogProduct,
@@ -10,6 +10,7 @@ import {
   useBannersQuery,
   useCartQuery,
   useCategoriesQuery,
+  useOrderWindowQuery,
   useProductsQuery,
   useRemoveCartItemMutation,
   useUpdateCartItemMutation,
@@ -17,6 +18,7 @@ import {
 import { imageUrl } from "../api/config";
 import { BannerCarousel } from "../components/BannerCarousel";
 import { Screen } from "../components/Screen";
+import { ProductGridSkeleton, Skeleton } from "../components/Skeleton";
 import { SearchBar } from "../components/SearchBar";
 import { useToast } from "../components/Toast";
 import type { RootStackParamList } from "../navigation/RootNavigator";
@@ -30,12 +32,24 @@ const BADGE_PINK = "#ff6b81";
 // are served by the web, not the backend, so the grid uses tints for now).
 const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
 
+// "HH:MM" → "10 AM" / "6:30 PM" for the pre-order strip.
+function fmtClock(t: string) {
+  const [hh, mm] = t.split(":");
+  let h = parseInt(hh, 10);
+  const ap = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return mm && mm !== "00" ? `${h}:${mm} ${ap}` : `${h} ${ap}`;
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners, refetch: refetchBanners } = useBannersQuery();
   const { data: categories, refetch: refetchCategories } = useCategoriesQuery();
+  const { data: orderWindow, refetch: refetchWindow } = useOrderWindowQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   // null = "All"; otherwise a category id used to filter the product query.
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
@@ -65,6 +79,7 @@ export default function HomeScreen() {
     refetchCategories();
     refetchBanners();
     refetchCart();
+    refetchWindow();
   };
   const [addToCart] = useAddToCartMutation();
   const [updateCartItem] = useUpdateCartItemMutation();
@@ -121,13 +136,24 @@ export default function HomeScreen() {
             <View style={styles.logoChip}>
               <Image source={require("../assets/milkkart-logo.png")} style={styles.logo} resizeMode="contain" />
             </View>
-            <View style={styles.avatar}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate("Main", {
+                  screen: "Profile",
+                  params: { screen: "ProfileHome" },
+                } as never)
+              }
+              style={styles.avatar}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open profile"
+            >
               {user?.avatar ? (
                 <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
               ) : (
                 <Text style={styles.avatarText}>{initial}</Text>
               )}
-            </View>
+            </Pressable>
           </View>
 
           <View style={styles.searchWrap}>
@@ -136,6 +162,16 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.content}>
+          {/* Next-day pre-order window — nudges customers to order before it closes. */}
+          {orderWindow?.enabled && orderWindow.open ? (
+            <View style={styles.preorder}>
+              <Ionicons name="sunny-outline" size={18} color="#d64a4a" />
+              <Text style={styles.preorderText}>
+                Pre-order for tomorrow — order before {fmtClock(orderWindow.end)}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Promo banners — live from the backend, with a static fallback while loading. */}
           {banners && banners.length > 0 ? (
             <BannerCarousel banners={banners} />
@@ -158,18 +194,24 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
           >
-            {catChips.map((c) => {
-              const active = c.id === activeCatId;
-              return (
-                <Pressable
-                  key={c.id ?? "all"}
-                  onPress={() => setActiveCatId(c.id)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.name}</Text>
-                </Pressable>
-              );
-            })}
+            {!categories ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} width={72} height={34} radius={999} />
+              ))
+            ) : (
+              catChips.map((c) => {
+                const active = c.id === activeCatId;
+                return (
+                  <Pressable
+                    key={c.id ?? "all"}
+                    onPress={() => setActiveCatId(c.id)}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.name}</Text>
+                  </Pressable>
+                );
+              })
+            )}
           </ScrollView>
 
           {/* Popular products / search results */}
@@ -177,7 +219,7 @@ export default function HomeScreen() {
             {query ? `Results for “${query}”` : "Popular Products"}
           </Text>
           {!products && isFetching ? (
-            <ActivityIndicator color={colors.green} style={{ marginTop: spacing(3) }} />
+            <ProductGridSkeleton />
           ) : products && products.length === 0 ? (
             <Text style={styles.empty}>
               {query ? `No products match “${query}”.` : "No products in this category yet."}
@@ -303,6 +345,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: colors.white,
   },
   avatarText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
   avatarImg: { width: "100%", height: "100%" },
@@ -310,6 +354,20 @@ const styles = StyleSheet.create({
 
   // Content ------------------------------------------------------------------
   content: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2.5) },
+
+  preorder: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1),
+    backgroundColor: "#fdeaea",
+    borderWidth: 1,
+    borderColor: "#f3b6b6",
+    borderRadius: 12,
+    paddingVertical: spacing(1.25),
+    paddingHorizontal: spacing(1.75),
+    marginBottom: spacing(2),
+  },
+  preorderText: { flex: 1, fontFamily: fonts.semibold, fontSize: 12.5, lineHeight: 17, color: "#b23b3b" },
 
   banner: {
     flexDirection: "row",

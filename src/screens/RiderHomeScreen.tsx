@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   RiderDelivery,
@@ -32,6 +32,19 @@ import { presentLocalAlert } from "../notifications/push";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+// Compact money for the tight stat card — drop paise, use k/L for big sums so
+// the value never gets shrunk to an unreadable size.
+const moneyCompact = (n: number | string) => {
+  const v = Number(n);
+  if (v >= 100000) return "₹" + (v / 100000).toFixed(v % 100000 ? 1 : 0).replace(/\.0$/, "") + "L";
+  if (v >= 1000) return "₹" + (v / 1000).toFixed(v % 1000 ? 1 : 0).replace(/\.0$/, "") + "k";
+  return "₹" + Math.round(v).toLocaleString("en-IN");
+};
+
+// "YYYY-MM-DD" → "30 Jun" for the next-day delivery badge.
+const shortDay = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -266,7 +279,14 @@ export default function RiderHomeScreen() {
               onPress={() => navigation.navigate("RiderDeliveries", { kind: "returned" })}
             />
           ) : null}
-          <StatCard icon="cash-outline" bg={colors.greenTint} fg={colors.green} value={money(stats?.earnings ?? 0)} label={t("earnings")} />
+          <StatCard
+            icon="cash-outline"
+            bg={colors.greenTint}
+            fg={colors.green}
+            value={moneyCompact(stats?.earnings ?? 0)}
+            label={t("earnings")}
+            onPress={() => navigation.navigate("RiderEarnings")}
+          />
         </View>
 
         {/* Cash on delivery */}
@@ -328,6 +348,14 @@ export default function RiderHomeScreen() {
               <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginTop: 1 }} />
               <Text style={styles.fullAddress}>{current.address}</Text>
             </View>
+            {current.delivery_type === "next_day" ? (
+              <View style={styles.nextDayChip}>
+                <Ionicons name="sunny-outline" size={13} color="#b98421" />
+                <Text style={styles.nextDayChipText}>
+                  Next-day{current.delivery_date ? ` · ${shortDay(current.delivery_date)}` : ""}
+                </Text>
+              </View>
+            ) : null}
             {/* COD orders can be paid by UPI — show a QR for the order amount. */}
             {current.is_cod ? (
               <Pressable style={({ pressed }) => [styles.upiBtn, pressed && { opacity: 0.85 }]} onPress={() => setUpiFor(current)}>
@@ -350,9 +378,18 @@ export default function RiderHomeScreen() {
                 <Ionicons name="navigate-outline" size={16} color={colors.green} />
                 <Text style={styles.navigateText}>{t("navigate")}</Text>
               </Pressable>
-              <Pressable style={styles.callBtn} onPress={soon()}>
-                <Ionicons name="call" size={17} color={colors.green} />
-              </Pressable>
+              {/* Call the customer — only once the order is accepted/picked up
+                  (after the rider taps Accept), not while it's just assigned. */}
+              {current.status !== "assigned" ? (
+                <Pressable
+                  style={styles.callBtn}
+                  onPress={() =>
+                    current.customer_phone ? Linking.openURL(`tel:${current.customer_phone}`) : toast(t("comingSoon"), "info")
+                  }
+                >
+                  <Ionicons name="call" size={17} color={colors.green} />
+                </Pressable>
+              ) : null}
               <Pressable
                 style={({ pressed }) => [styles.deliveredBtn, (pressed || accepting || picking) && { opacity: 0.85 }]}
                 onPress={() => advance(current)}
@@ -468,7 +505,10 @@ function DeliveryRow({ d, onOpen }: { d: RiderDelivery; onOpen: () => void }) {
             </Text>
           </View>
         </View>
-        <Text style={styles.deliveryAddr} numberOfLines={1}>#{d.order_number.slice(0, 8)}</Text>
+        <Text style={styles.deliveryAddr} numberOfLines={1}>
+          #{d.order_number.slice(0, 8)}
+          {d.delivery_type === "next_day" ? ` · Next-day${d.delivery_date ? ` ${shortDay(d.delivery_date)}` : ""}` : ""}
+        </Text>
       </View>
       <Text style={styles.deliveryAmount}>{money(d.total)}</Text>
     </View>
@@ -592,6 +632,18 @@ const styles = StyleSheet.create({
   collectPrepaid: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   addressRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing(1.5) },
   fullAddress: { flex: 1, fontFamily: fontsAlt.regular, fontSize: 13, color: colors.text, lineHeight: 19 },
+  nextDayChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    backgroundColor: "#fff4d6",
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    marginTop: spacing(1),
+  },
+  nextDayChipText: { fontFamily: fonts.bold, fontSize: 11, color: "#b98421" },
 
   // Product thumbnail stack (like My Orders)
   thumbs: { flexDirection: "row" },

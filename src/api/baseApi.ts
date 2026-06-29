@@ -133,6 +133,16 @@ export type ServiceabilityResult = {
   area: { name?: string; city?: string; delivery_eta_minutes: number | null } | null;
 };
 
+// Status of the next-day pre-order window (admin-configured). When `open`,
+// customers may place orders for `next_delivery_date`.
+export type OrderWindow = {
+  enabled: boolean;
+  open: boolean;
+  start: string; // "HH:MM"
+  end: string; // "HH:MM"
+  next_delivery_date: string | null;
+};
+
 export type OrderSummary = {
   id: number;
   order_number: string;
@@ -178,6 +188,10 @@ export type OrderDetail = {
   total: string;
   coupon_code: string | null;
   address_snapshot: string;
+  delivery_type: "instant" | "next_day";
+  delivery_date: string | null;
+  /** Status driving the progress timeline (next-day auto-advances on its day). */
+  timeline_status: string;
   notes: string;
   items: OrderItemDetail[];
   assignment: OrderAssignment | null;
@@ -242,6 +256,9 @@ export type RiderDelivery = {
   total: string;
   status: string;
   type: "instant" | "subscription";
+  // Instant same-day vs a next-day pre-order, and its scheduled delivery date.
+  delivery_type: "instant" | "next_day";
+  delivery_date: string | null;
   is_cod: boolean;
   cod_amount: string;
   item_count: number;
@@ -258,6 +275,25 @@ export type RiderDeliveryKind = "delivered" | "pending" | "returned";
 export type RiderDeliveriesList = {
   kind: RiderDeliveryKind;
   deliveries: RiderDelivery[];
+};
+
+export type RiderEarningsDaily = { date: string; deliveries: number; earnings: string };
+export type RiderEarningsProduct = {
+  product_name: string;
+  image_url: string;
+  qty: number;
+  deliveries: number;
+  earnings: string;
+};
+export type RiderEarnings = {
+  fee_per_delivery: string;
+  total_earnings: string;
+  total_deliveries: number;
+  // The day being inspected (defaults to today) and that day's figures.
+  date: string;
+  selected: { date: string; deliveries: number; earnings: string };
+  daily: RiderEarningsDaily[];
+  by_product: RiderEarningsProduct[];
 };
 
 export type RiderDay = {
@@ -371,6 +407,108 @@ export type NotificationPreferences = {
   updated_at: string;
 };
 
+// ---- Back-office (admin/ops) shapes — see apps/orders/admin_serializers ----
+export type AdminOrder = {
+  order_number: string;
+  status: string;
+  total: string;
+  customer_phone: string;
+  customer_name: string;
+  address_snapshot: string;
+  item_count: number;
+  placed_at: string;
+  rider: { rider_id: number; phone: string; vehicle_number: string; status: string } | null;
+};
+
+export type AdminRider = {
+  id: number;
+  phone: string;
+  name: string;
+  is_on_duty: boolean;
+  load: number;
+};
+
+export type AdminOrderDetail = {
+  order_number: string;
+  status: string;
+  subtotal: string;
+  discount: string;
+  delivery_fee: string;
+  small_cart_fee: string;
+  tax: string;
+  total: string;
+  coupon_code: string | null;
+  customer_phone: string;
+  customer_name: string;
+  address_snapshot: string;
+  delivery_type: "instant" | "next_day";
+  delivery_date: string | null;
+  placed_at: string;
+  items: OrderItemDetail[];
+  rider: { rider_id: number; phone: string; vehicle_number: string; status: string } | null;
+  payment_method: string;
+  payment_label: string;
+};
+
+export type AdminCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  is_active: boolean;
+  sort_order: number;
+  product_count: number;
+};
+
+export type AdminVariant = {
+  id: number;
+  label: string;
+  sku: string;
+  unit: string;
+  quantity_value: string;
+  fat_percent: string | null;
+  price: string;
+  mrp: string;
+  stock: number;
+  barcode: string;
+  is_default: boolean;
+  is_active: boolean;
+  discount_percent: number;
+  in_stock: boolean;
+};
+
+export type AdminProduct = {
+  id: number;
+  name: string;
+  slug: string;
+  brand: string;
+  description: string;
+  image_url: string;
+  tags: string;
+  category: number;
+  category_name: string;
+  is_active: boolean;
+  variants: AdminVariant[];
+  variant_count: number;
+  total_stock: number;
+  created_at: string;
+};
+
+// Dashboard reports (apps/reports)
+export type DateRange = { start: string; end: string };
+export type SalesReport = { start: string; end: string; orders: number; revenue: string; average_order_value: string };
+export type OrderStatusReport = Record<string, number>;
+export type TopProduct = { product_name: string; quantity: number; revenue: string };
+export type SubscriptionReport = {
+  active: number;
+  paused: number;
+  cancelled: number;
+  total: number;
+  new_in_period: number;
+  cancelled_in_period: number;
+};
+export type RiderPerf = { rider: string; assignments: number; delivered: number; avg_rider_rating: number | null };
+
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const rawBaseQuery = fetchBaseQuery({
@@ -420,7 +558,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -505,6 +643,10 @@ export const api = createApi({
     }),
     riderDeliveries: build.query<RiderDeliveriesList, RiderDeliveryKind>({
       query: (kind) => `/rider/deliveries/?kind=${kind}`,
+      providesTags: ["RiderDay"],
+    }),
+    riderEarnings: build.query<RiderEarnings, string | undefined>({
+      query: (date) => `/rider/earnings/${date ? `?date=${date}` : ""}`,
       providesTags: ["RiderDay"],
     }),
     acceptOrder: build.mutation<unknown, string>({
@@ -627,6 +769,9 @@ export const api = createApi({
     deliverySlots: build.query<DeliverySlot[], void>({
       query: () => "/orders/delivery-slots/",
     }),
+    orderWindow: build.query<OrderWindow, void>({
+      query: () => "/orders/window/",
+    }),
     serviceabilityCheck: build.query<
       ServiceabilityResult,
       { pincode?: string; lat?: number; lng?: number }
@@ -639,7 +784,10 @@ export const api = createApi({
         return `/serviceability/check/${p.length ? `?${p.join("&")}` : ""}`;
       },
     }),
-    checkout: build.mutation<{ order_number: string }, { address_id: number; delivery_slot_id?: number }>({
+    checkout: build.mutation<
+      { order_number: string },
+      { address_id: number; delivery_slot_id?: number; delivery_day?: "instant" | "next_day" }
+    >({
       query: (body) => ({ url: "/orders/checkout/", method: "POST", body }),
       invalidatesTags: ["Cart", "Order"],
     }),
@@ -803,6 +951,108 @@ export const api = createApi({
     registerDevice: build.mutation<unknown, { token: string; platform: string }>({
       query: (body) => ({ url: "/notifications/devices/", method: "POST", body }),
     }),
+
+    // ---- Back-office (admin/ops) — gated server-side by staff-role perms -----
+    adminOrders: build.query<AdminOrder[], { status?: string; start?: string; end?: string } | void>({
+      query: (arg) => {
+        const p: string[] = [];
+        if (arg?.status) p.push(`status=${arg.status}`);
+        if (arg?.start) p.push(`start=${arg.start}`);
+        if (arg?.end) p.push(`end=${arg.end}`);
+        return `/admin/orders/${p.length ? `?${p.join("&")}` : ""}`;
+      },
+      providesTags: ["AdminOrder"],
+    }),
+    adminRiders: build.query<AdminRider[], void>({
+      query: () => "/admin/riders/",
+    }),
+    adminOrderDetail: build.query<AdminOrderDetail, string>({
+      query: (orderNumber) => `/admin/orders/${orderNumber}/`,
+      providesTags: ["AdminOrder"],
+    }),
+    adminConfirmOrder: build.mutation<unknown, string>({
+      query: (orderNumber) => ({ url: `/admin/orders/${orderNumber}/confirm/`, method: "POST" }),
+      invalidatesTags: ["AdminOrder"],
+    }),
+    adminCancelOrder: build.mutation<unknown, string>({
+      query: (orderNumber) => ({ url: `/admin/orders/${orderNumber}/cancel/`, method: "POST" }),
+      invalidatesTags: ["AdminOrder"],
+    }),
+    adminAssignOrder: build.mutation<unknown, { orderNumber: string; rider_id?: number }>({
+      query: ({ orderNumber, rider_id }) => ({
+        url: `/admin/orders/${orderNumber}/assign/`,
+        method: "POST",
+        body: rider_id ? { rider_id } : {},
+      }),
+      invalidatesTags: ["AdminOrder"],
+    }),
+
+    // Catalog management (categories, products, variants)
+    adminCategories: build.query<AdminCategory[], void>({
+      query: () => "/admin/catalog/categories/",
+      providesTags: ["AdminCategory"],
+    }),
+    adminCreateCategory: build.mutation<AdminCategory, Partial<AdminCategory>>({
+      query: (body) => ({ url: "/admin/catalog/categories/", method: "POST", body }),
+      invalidatesTags: ["AdminCategory"],
+    }),
+    adminUpdateCategory: build.mutation<AdminCategory, { id: number } & Partial<AdminCategory>>({
+      query: ({ id, ...body }) => ({ url: `/admin/catalog/categories/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminCategory"],
+    }),
+    adminDeleteCategory: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/catalog/categories/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminCategory", "AdminProduct"],
+    }),
+    adminProducts: build.query<AdminProduct[], void>({
+      query: () => "/admin/catalog/products/",
+      providesTags: ["AdminProduct"],
+    }),
+    adminProduct: build.query<AdminProduct, number>({
+      query: (id) => `/admin/catalog/products/${id}/`,
+      providesTags: ["AdminProduct"],
+    }),
+    adminCreateProduct: build.mutation<AdminProduct, Partial<AdminProduct>>({
+      query: (body) => ({ url: "/admin/catalog/products/", method: "POST", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminUpdateProduct: build.mutation<AdminProduct, { id: number } & Partial<AdminProduct>>({
+      query: ({ id, ...body }) => ({ url: `/admin/catalog/products/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminDeleteProduct: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/catalog/products/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminCreateVariant: build.mutation<AdminVariant, { productId: number } & Partial<AdminVariant>>({
+      query: ({ productId, ...body }) => ({ url: `/admin/catalog/products/${productId}/variants/`, method: "POST", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminUpdateVariant: build.mutation<AdminVariant, { id: number } & Partial<AdminVariant>>({
+      query: ({ id, ...body }) => ({ url: `/admin/catalog/variants/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+    adminDeleteVariant: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/catalog/variants/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminProduct"],
+    }),
+
+    // Dashboard reports (read-only, parameterised by a date range)
+    adminSales: build.query<SalesReport, DateRange>({
+      query: ({ start, end }) => `/reports/sales/?start=${start}&end=${end}`,
+    }),
+    adminOrderStatus: build.query<OrderStatusReport, DateRange>({
+      query: ({ start, end }) => `/reports/order-status/?start=${start}&end=${end}`,
+    }),
+    adminTopProducts: build.query<TopProduct[], DateRange & { limit?: number }>({
+      query: ({ start, end, limit = 8 }) => `/reports/top-products/?start=${start}&end=${end}&limit=${limit}`,
+    }),
+    adminSubscriptionReport: build.query<SubscriptionReport, DateRange>({
+      query: ({ start, end }) => `/reports/subscriptions/?start=${start}&end=${end}`,
+    }),
+    adminRiderReport: build.query<RiderPerf[], DateRange>({
+      query: ({ start, end }) => `/reports/riders/?start=${start}&end=${end}`,
+    }),
   }),
 });
 
@@ -824,6 +1074,7 @@ export const {
   useSetRiderDutyMutation,
   useRiderDayQuery,
   useRiderDeliveriesQuery,
+  useRiderEarningsQuery,
   useAcceptOrderMutation,
   usePickupOrderMutation,
   useDeliverOrderMutation,
@@ -839,6 +1090,7 @@ export const {
   useApplyCouponMutation,
   useRemoveCouponMutation,
   useDeliverySlotsQuery,
+  useOrderWindowQuery,
   useServiceabilityCheckQuery,
   useCheckoutMutation,
   useOrdersQuery,
@@ -868,4 +1120,27 @@ export const {
   useNotificationPreferencesQuery,
   useUpdateNotificationPreferencesMutation,
   useRegisterDeviceMutation,
+  useAdminOrdersQuery,
+  useAdminRidersQuery,
+  useAdminConfirmOrderMutation,
+  useAdminCancelOrderMutation,
+  useAdminAssignOrderMutation,
+  useAdminOrderDetailQuery,
+  useAdminCategoriesQuery,
+  useAdminCreateCategoryMutation,
+  useAdminUpdateCategoryMutation,
+  useAdminDeleteCategoryMutation,
+  useAdminProductsQuery,
+  useAdminProductQuery,
+  useAdminCreateProductMutation,
+  useAdminUpdateProductMutation,
+  useAdminDeleteProductMutation,
+  useAdminCreateVariantMutation,
+  useAdminUpdateVariantMutation,
+  useAdminDeleteVariantMutation,
+  useAdminSalesQuery,
+  useAdminOrderStatusQuery,
+  useAdminTopProductsQuery,
+  useAdminSubscriptionReportQuery,
+  useAdminRiderReportQuery,
 } = api;

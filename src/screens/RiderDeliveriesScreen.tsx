@@ -3,7 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   RefreshControl,
@@ -17,6 +16,7 @@ import { RiderDelivery, useRiderDeliveriesQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { OrderItemsModal } from "../components/OrderItemsModal";
 import { Screen } from "../components/Screen";
+import { ListSkeleton } from "../components/Skeleton";
 import { useT } from "../i18n/LanguageProvider";
 import type { TKey } from "../i18n/translations";
 import type { RiderHomeStackParamList } from "../navigation/RiderHomeStack";
@@ -51,6 +51,10 @@ function timeText(iso?: string | null) {
   h = h % 12 || 12;
   return `${h}:${min} ${ampm}`;
 }
+
+// "YYYY-MM-DD" → "30 Jun" for the next-day delivery pill.
+const shortDay = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
 const STATUS_PILL: Record<string, { key: TKey; bg: string; fg: string }> = {
   delivered: { key: "statusDelivered", bg: colors.greenTint, fg: colors.green },
@@ -91,9 +95,11 @@ export default function RiderDeliveriesScreen() {
     <Screen padded={false}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
-          <Ionicons name="arrow-back" size={22} color={colors.heading} />
-        </Pressable>
+        {navigation.canGoBack() ? (
+          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+            <Ionicons name="arrow-back" size={22} color={colors.heading} />
+          </Pressable>
+        ) : null}
         <View style={styles.flex}>
           <Text style={styles.title}>{t(KIND_TITLE[kind])}</Text>
           {!isLoading ? (
@@ -105,9 +111,7 @@ export default function RiderDeliveriesScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.green} />
-        </View>
+        <ListSkeleton rows={6} />
       ) : (
         <SectionList
           sections={sections}
@@ -174,6 +178,13 @@ function DeliveryCard({ d, onPress }: { d: RiderDelivery; onPress: () => void })
               {d.is_cod ? t("codShort") : t("prepaidShort")}
             </Text>
           </View>
+          {d.delivery_type === "next_day" ? (
+            <View style={[styles.payPill, styles.nextDayPill]}>
+              <Text style={[styles.payText, styles.nextDayPillText]}>
+                {d.delivery_date ? `NEXT-DAY ${shortDay(d.delivery_date)}` : "NEXT-DAY"}
+              </Text>
+            </View>
+          ) : null}
           {d.at ? <Text style={styles.cardTime}>{timeText(d.at)}</Text> : null}
         </View>
       </View>
@@ -248,5 +259,7 @@ const styles = StyleSheet.create({
   payText: { fontFamily: fontsAlt.extrabold, fontSize: 9, letterSpacing: 0.5 },
   payTextCod: { color: "#b98421" },
   payTextPrepaid: { color: colors.green },
+  nextDayPill: { backgroundColor: "#e8f2fc" },
+  nextDayPillText: { color: colors.info },
   cardTime: { marginLeft: "auto", fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted },
 });

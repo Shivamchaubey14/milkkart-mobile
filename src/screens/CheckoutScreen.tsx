@@ -12,6 +12,7 @@ import {
   useCheckoutMutation,
   useDeliverySlotsQuery,
   useInitiatePaymentMutation,
+  useOrderWindowQuery,
   useServiceabilityCheckQuery,
 } from "../api/baseApi";
 import { Screen } from "../components/Screen";
@@ -51,6 +52,10 @@ function to12(t: string) {
   h = h % 12 || 12;
   return mm && mm !== "00" ? `${h}:${mm} ${ampm}` : `${h} ${ampm}`;
 }
+function dateLabel(date: string) {
+  const d = new Date(date + "T00:00:00");
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
 function slotTime(s: DeliverySlot) {
   return `${to12(s.start_time).replace(/ [AP]M$/, "")} – ${to12(s.end_time)}`;
 }
@@ -69,12 +74,15 @@ export default function CheckoutScreen() {
   const toast = useToast();
   const { data: addresses } = useAddressesQuery();
   const { data: slots } = useDeliverySlotsQuery();
+  // Refetch on every open so an admin change to the window reflects right away.
+  const { data: orderWindow } = useOrderWindowQuery(undefined, { refetchOnMountOrArgChange: true });
   const { data: cart } = useCartQuery();
   const [checkout, { isLoading: placingCheckout }] = useCheckoutMutation();
   const [initiatePayment, { isLoading: paying }] = useInitiatePaymentMutation();
 
   const [addressId, setAddressId] = useState<number | null>(null);
   const [slotId, setSlotId] = useState<number | null>(null); // null = Instant
+  const [nextDay, setNextDay] = useState(false); // next-day pre-order chosen
   const [method, setMethod] = useState("upi");
 
   useEffect(() => {
@@ -119,7 +127,8 @@ export default function CheckoutScreen() {
     try {
       const order = await checkout({
         address_id: addressId,
-        delivery_slot_id: slotId ?? undefined,
+        delivery_day: nextDay ? "next_day" : "instant",
+        delivery_slot_id: nextDay ? undefined : (slotId ?? undefined),
       }).unwrap();
       await initiatePayment({ order_number: order.order_number, method: pm.backend }).unwrap();
       toast("Order placed successfully!");
@@ -191,23 +200,54 @@ export default function CheckoutScreen() {
             </View>
           )}
 
-          {/* Delivery slot */}
-          <Text style={styles.sectionLabel}>DELIVERY SLOT</Text>
+          {/* Delivery timing */}
+          <Text style={styles.sectionLabel}>DELIVERY TIMING</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotRow}>
-            <Pressable
-              onPress={() => setSlotId(null)}
-              style={[styles.slot, slotId === null && styles.slotActive]}
-            >
-              <Ionicons name="flash" size={16} color={slotId === null ? colors.green : colors.muted} />
-              <Text style={[styles.slotTitle, slotId === null && styles.slotTitleActive]}>Instant</Text>
-              <Text style={[styles.slotSub, slotId === null && styles.slotSubActive]}>Within {eta} min</Text>
-            </Pressable>
+            {(() => {
+              const instantActive = !nextDay && slotId === null;
+              return (
+                <Pressable
+                  onPress={() => {
+                    setNextDay(false);
+                    setSlotId(null);
+                  }}
+                  style={[styles.slot, instantActive && styles.slotActive]}
+                >
+                  <Ionicons name="flash" size={16} color={instantActive ? colors.green : colors.muted} />
+                  <Text style={[styles.slotTitle, instantActive && styles.slotTitleActive]}>Instant</Text>
+                  <Text style={[styles.slotSub, instantActive && styles.slotSubActive]}>Within {eta} min</Text>
+                </Pressable>
+              );
+            })()}
+            {orderWindow?.enabled ? (
+              <Pressable
+                disabled={!orderWindow.open}
+                onPress={() => {
+                  setNextDay(true);
+                  setSlotId(null);
+                }}
+                style={[styles.slot, nextDay && styles.slotActive, !orderWindow.open && styles.slotDisabled]}
+              >
+                <Ionicons name="sunny-outline" size={16} color={nextDay ? colors.green : colors.muted} />
+                <Text style={[styles.slotTitle, nextDay && styles.slotTitleActive]}>Next day</Text>
+                <Text style={[styles.slotSub, nextDay && styles.slotSubActive]}>
+                  {orderWindow.open
+                    ? orderWindow.next_delivery_date
+                      ? dateLabel(orderWindow.next_delivery_date)
+                      : "Tomorrow"
+                    : `Opens ${to12(orderWindow.start)}–${to12(orderWindow.end)}`}
+                </Text>
+              </Pressable>
+            ) : null}
             {upcomingSlots.map((s) => {
-              const active = s.id === slotId;
+              const active = !nextDay && s.id === slotId;
               return (
                 <Pressable
                   key={s.id}
-                  onPress={() => setSlotId(s.id)}
+                  onPress={() => {
+                    setNextDay(false);
+                    setSlotId(s.id);
+                  }}
                   style={[styles.slot, active && styles.slotActive]}
                 >
                   <Text style={[styles.slotTitle, active && styles.slotTitleActive]}>{dayLabel(s.date)}</Text>
@@ -381,6 +421,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   slotActive: { borderColor: colors.green, backgroundColor: colors.greenTint },
+  slotDisabled: { opacity: 0.5 },
   slotTitle: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading, marginTop: 2 },
   slotTitleActive: { color: colors.green },
   slotSub: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted, marginTop: 2 },

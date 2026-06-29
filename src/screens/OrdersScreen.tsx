@@ -17,6 +17,7 @@ import {
 import { OrderSummary, useOrdersQuery } from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { Screen } from "../components/Screen";
+import { ListSkeleton } from "../components/Skeleton";
 import { useToast } from "../components/Toast";
 import { useInvoiceDownloader } from "../invoices/useInvoiceDownloader";
 import type { ProfileStackParamList } from "../navigation/ProfileStack";
@@ -111,9 +112,7 @@ export default function OrdersScreen() {
         </ScrollView>
 
         {isLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.green} />
-          </View>
+          <ListSkeleton rows={5} />
         ) : visible.length === 0 ? (
           <View style={styles.center}>
             <View style={styles.emptyBadge}>
