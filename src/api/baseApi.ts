@@ -428,6 +428,28 @@ export type AdminRider = {
   load: number;
 };
 
+export type AdminOrderDetail = {
+  order_number: string;
+  status: string;
+  subtotal: string;
+  discount: string;
+  delivery_fee: string;
+  small_cart_fee: string;
+  tax: string;
+  total: string;
+  coupon_code: string | null;
+  customer_phone: string;
+  customer_name: string;
+  address_snapshot: string;
+  delivery_type: "instant" | "next_day";
+  delivery_date: string | null;
+  placed_at: string;
+  items: OrderItemDetail[];
+  rider: { rider_id: number; phone: string; vehicle_number: string; status: string } | null;
+  payment_method: string;
+  payment_label: string;
+};
+
 export type AdminCategory = {
   id: number;
   name: string;
@@ -944,6 +966,10 @@ export const api = createApi({
     adminRiders: build.query<AdminRider[], void>({
       query: () => "/admin/riders/",
     }),
+    adminOrderDetail: build.query<AdminOrderDetail, string>({
+      query: (orderNumber) => `/admin/orders/${orderNumber}/`,
+      providesTags: ["AdminOrder"],
+    }),
     adminConfirmOrder: build.mutation<unknown, string>({
       query: (orderNumber) => ({ url: `/admin/orders/${orderNumber}/confirm/`, method: "POST" }),
       invalidatesTags: ["AdminOrder"],
@@ -1099,6 +1125,7 @@ export const {
   useAdminConfirmOrderMutation,
   useAdminCancelOrderMutation,
   useAdminAssignOrderMutation,
+  useAdminOrderDetailQuery,
   useAdminCategoriesQuery,
   useAdminCreateCategoryMutation,
   useAdminUpdateCategoryMutation,

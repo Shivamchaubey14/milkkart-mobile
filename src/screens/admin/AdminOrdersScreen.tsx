@@ -2,15 +2,18 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   AdminOrder,
+  AdminOrderDetail,
   useAdminAssignOrderMutation,
   useAdminCancelOrderMutation,
   useAdminConfirmOrderMutation,
+  useAdminOrderDetailQuery,
   useAdminOrdersQuery,
 } from "../../api/baseApi";
+import { imageUrl } from "../../api/config";
 import { Screen } from "../../components/Screen";
 import { ListSkeleton } from "../../components/Skeleton";
 import { useToast } from "../../components/Toast";
@@ -54,6 +57,7 @@ export default function AdminOrdersScreen() {
   const [start, setStart] = useState<Date>(today());
   const [end, setEnd] = useState<Date>(today());
   const [picker, setPicker] = useState<"start" | "end" | null>(null);
+  const [selected, setSelected] = useState<string | null>(null); // order_number for the detail sheet
   const isToday = iso(start) === iso(today()) && iso(end) === iso(today());
 
   const { data: orders, isLoading, isFetching, refetch } = useAdminOrdersQuery(
@@ -178,7 +182,11 @@ export default function AdminOrdersScreen() {
             orders.map((o) => {
               const s = statusOf(o.status);
               return (
-                <View key={o.order_number} style={styles.card}>
+                <Pressable
+                  key={o.order_number}
+                  style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+                  onPress={() => setSelected(o.order_number)}
+                >
                   <View style={styles.cardTop}>
                     <Text style={styles.orderNo}>#{o.order_number.slice(0, 8)}</Text>
                     <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
@@ -225,13 +233,123 @@ export default function AdminOrdersScreen() {
                       </Pressable>
                     </View>
                   ) : null}
-                </View>
+                </Pressable>
               );
             })
           )}
         </ScrollView>
       )}
+
+      {selected ? <OrderDetailSheet orderNumber={selected} onClose={() => setSelected(null)} /> : null}
     </Screen>
+  );
+}
+
+// ---- Order detail sheet — slides up from the bottom on card tap ------------
+function OrderDetailSheet({ orderNumber, onClose }: { orderNumber: string; onClose: () => void }) {
+  const { data: o, isLoading } = useAdminOrderDetailQuery(orderNumber);
+  const s = o ? statusOf(o.status) : null;
+
+  return (
+    <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <Pressable style={sheet.backdrop} onPress={onClose} />
+      <View style={sheet.sheet}>
+        <View style={sheet.handle} />
+        {isLoading || !o ? (
+          <ActivityIndicator color={colors.green} style={{ paddingVertical: spacing(5) }} />
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={sheet.body}>
+            {/* Title row */}
+            <View style={sheet.titleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={sheet.orderNo}>#{o.order_number.slice(0, 8)}</Text>
+                <Text style={sheet.placed}>{new Date(o.placed_at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</Text>
+              </View>
+              {s ? (
+                <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
+                  <Text style={[styles.statusText, { color: s.fg }]}>{s.label}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Customer */}
+            <View style={sheet.block}>
+              <Text style={sheet.blockLabel}>CUSTOMER</Text>
+              <Text style={sheet.custName}>{o.customer_name?.trim() || "Customer"}</Text>
+              <Pressable style={sheet.phoneRow} onPress={() => Linking.openURL(`tel:${o.customer_phone}`)}>
+                <Ionicons name="call-outline" size={14} color={colors.green} />
+                <Text style={sheet.phone}>{o.customer_phone}</Text>
+              </Pressable>
+              {o.address_snapshot ? <Text style={sheet.addr}>{o.address_snapshot}</Text> : null}
+            </View>
+
+            {/* Delivery + rider */}
+            <View style={sheet.row2}>
+              <View style={[sheet.block, sheet.half]}>
+                <Text style={sheet.blockLabel}>DELIVERY</Text>
+                <Text style={sheet.value}>
+                  {o.delivery_type === "next_day" ? "Next day" : "Instant"}
+                  {o.delivery_type === "next_day" && o.delivery_date ? `\n${o.delivery_date}` : ""}
+                </Text>
+              </View>
+              <View style={[sheet.block, sheet.half]}>
+                <Text style={sheet.blockLabel}>RIDER</Text>
+                <Text style={sheet.value}>
+                  {o.rider ? `${o.rider.phone}\n${o.rider.status.replace(/_/g, " ")}` : "Unassigned"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Items */}
+            <Text style={sheet.section}>PRODUCTS ({o.items.length})</Text>
+            {o.items.map((it) => {
+              const img = imageUrl(it.image_url);
+              return (
+                <View key={it.id} style={sheet.itemRow}>
+                  <View style={sheet.itemThumb}>
+                    {img ? <Image source={{ uri: img }} style={sheet.itemImg} resizeMode="contain" /> : null}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={sheet.itemName} numberOfLines={1}>{it.product_name}</Text>
+                    <Text style={sheet.itemMeta}>
+                      {it.variant_label ? `${it.variant_label} · ` : ""}{money(it.product_price)} × {it.quantity}
+                    </Text>
+                  </View>
+                  <Text style={sheet.itemSub}>{money(it.subtotal)}</Text>
+                </View>
+              );
+            })}
+
+            {/* Bill */}
+            <View style={sheet.bill}>
+              <BillRow label="Subtotal" value={money(o.subtotal)} />
+              {Number(o.discount) > 0 ? <BillRow label={`Discount${o.coupon_code ? ` (${o.coupon_code})` : ""}`} value={`−${money(o.discount)}`} green /> : null}
+              <BillRow label="Delivery & fees" value={money(Number(o.delivery_fee) + Number(o.small_cart_fee))} />
+              <BillRow label="Tax" value={money(o.tax)} />
+              <View style={sheet.billDivider} />
+              <BillRow label="Total" value={money(o.total)} strong />
+              <View style={sheet.payRow}>
+                <Text style={sheet.payLabel}>Payment</Text>
+                <Text style={sheet.payValue}>{o.payment_label || "—"}</Text>
+              </View>
+            </View>
+
+            <Pressable style={sheet.closeBtn} onPress={onClose}>
+              <Text style={sheet.closeText}>Close</Text>
+            </Pressable>
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+function BillRow({ label, value, strong, green }: { label: string; value: string; strong?: boolean; green?: boolean }) {
+  return (
+    <View style={sheet.billRow}>
+      <Text style={[sheet.billLabel, strong && sheet.billStrong]}>{label}</Text>
+      <Text style={[sheet.billValue, strong && sheet.billStrong, green && { color: colors.green }]}>{value}</Text>
+    </View>
   );
 }
 
@@ -301,4 +419,46 @@ const styles = StyleSheet.create({
   emptyBadge: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center", marginBottom: spacing(2) },
   emptyTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.heading },
   emptySub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, marginTop: 4 },
+});
+
+const sheet = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, maxHeight: "86%", paddingHorizontal: spacing(2.5), paddingTop: spacing(1.25) },
+  handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(1.5) },
+  body: { paddingBottom: spacing(3) },
+
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  orderNo: { fontFamily: fonts.bold, fontSize: 20, color: colors.heading },
+  placed: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
+
+  block: { backgroundColor: colors.bgSoft, borderRadius: 14, padding: spacing(1.5), marginTop: spacing(1.75) },
+  blockLabel: { fontFamily: fontsAlt.extrabold, fontSize: 9, letterSpacing: 0.8, color: colors.muted, marginBottom: spacing(0.75) },
+  custName: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+  phoneRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing(0.75) },
+  phone: { fontFamily: fonts.semibold, fontSize: 13, color: colors.green },
+  addr: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.text, lineHeight: 18, marginTop: spacing(0.75) },
+  row2: { flexDirection: "row", gap: spacing(1.5) },
+  half: { flex: 1 },
+  value: { fontFamily: fonts.semibold, fontSize: 13, color: colors.heading, lineHeight: 18 },
+
+  section: { fontFamily: fontsAlt.extrabold, fontSize: 10, letterSpacing: 0.8, color: colors.muted, marginTop: spacing(2.5), marginBottom: spacing(1) },
+  itemRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), paddingVertical: spacing(0.75) },
+  itemThumb: { width: 42, height: 42, borderRadius: 10, backgroundColor: colors.bgSoft, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  itemImg: { width: "100%", height: "100%" },
+  itemName: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
+  itemMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
+  itemSub: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
+
+  bill: { backgroundColor: colors.bgSoft, borderRadius: 14, padding: spacing(1.75), marginTop: spacing(2) },
+  billRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: spacing(0.5) },
+  billLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.heading },
+  billValue: { fontFamily: fonts.semibold, fontSize: 14, color: colors.heading },
+  billStrong: { fontFamily: fonts.bold, fontSize: 16 },
+  billDivider: { height: 1, backgroundColor: colors.line, marginVertical: spacing(1) },
+  payRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing(1), paddingTop: spacing(1), borderTopWidth: 1, borderTopColor: colors.line },
+  payLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.muted },
+  payValue: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
+
+  closeBtn: { height: 50, borderRadius: 14, backgroundColor: colors.heading, alignItems: "center", justifyContent: "center", marginTop: spacing(2.5) },
+  closeText: { fontFamily: fonts.bold, fontSize: 15, color: colors.white },
 });
