@@ -20,7 +20,7 @@ const money = (n: number | string) => "₹" + Number(n).toFixed(2);
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const dayLabel = (d: Date) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+const dayLabel = (d: Date) => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 const today = () => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -112,27 +112,21 @@ export default function AdminOrdersScreen() {
       <View style={styles.dateBar}>
         <Pressable style={styles.dateBtn} onPress={() => setPicker("start")}>
           <View style={styles.calIcon}>
-            <Ionicons name="calendar-outline" size={16} color={colors.green} />
+            <Ionicons name="calendar-outline" size={13} color={colors.green} />
           </View>
-          <View>
-            <Text style={styles.dateCaption}>From</Text>
-            <Text style={styles.dateValue}>{dayLabel(start)}</Text>
+          <View style={styles.dateText}>
+            <Text style={styles.dateCaption}>FROM</Text>
+            <Text style={styles.dateValue} numberOfLines={1}>{dayLabel(start)}</Text>
           </View>
         </Pressable>
         <Pressable style={styles.dateBtn} onPress={() => setPicker("end")}>
           <View style={styles.calIcon}>
-            <Ionicons name="calendar-outline" size={16} color={colors.green} />
+            <Ionicons name="calendar-outline" size={13} color={colors.green} />
           </View>
-          <View>
-            <Text style={styles.dateCaption}>To</Text>
-            <Text style={styles.dateValue}>{dayLabel(end)}</Text>
+          <View style={styles.dateText}>
+            <Text style={styles.dateCaption}>TO</Text>
+            <Text style={styles.dateValue} numberOfLines={1}>{dayLabel(end)}</Text>
           </View>
-        </Pressable>
-        <Pressable
-          style={[styles.todayBtn, isToday && styles.todayBtnActive]}
-          onPress={() => { setStart(today()); setEnd(today()); }}
-        >
-          <Text style={[styles.todayText, isToday && styles.todayTextActive]}>Today</Text>
         </Pressable>
       </View>
 
@@ -257,27 +251,24 @@ const styles = StyleSheet.create({
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
   headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.white },
 
-  // Date filter — rounded-square calendar buttons
-  dateBar: { flexDirection: "row", alignItems: "stretch", gap: spacing(1), paddingHorizontal: spacing(2.5), paddingTop: spacing(2) },
+  // Date filter — compact rounded-square calendar buttons
+  dateBar: { flexDirection: "row", alignItems: "stretch", gap: spacing(0.75), paddingHorizontal: spacing(2.5), paddingTop: spacing(2) },
   dateBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing(1),
+    gap: spacing(0.75),
     backgroundColor: colors.bg,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 14,
-    paddingVertical: spacing(1),
-    paddingHorizontal: spacing(1.25),
+    borderRadius: 12,
+    paddingVertical: spacing(0.75),
+    paddingHorizontal: spacing(1),
   },
-  calIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
-  dateCaption: { fontFamily: fontsAlt.extrabold, fontSize: 9, letterSpacing: 0.8, color: colors.muted },
-  dateValue: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading, marginTop: 1 },
-  todayBtn: { borderRadius: 14, paddingHorizontal: spacing(1.75), alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line, backgroundColor: colors.bg },
-  todayBtnActive: { backgroundColor: colors.green, borderColor: colors.green },
-  todayText: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
-  todayTextActive: { color: colors.white },
+  calIcon: { width: 24, height: 24, borderRadius: 8, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
+  dateText: { flex: 1, minWidth: 0 },
+  dateCaption: { fontFamily: fontsAlt.extrabold, fontSize: 8, letterSpacing: 0.6, color: colors.muted },
+  dateValue: { fontFamily: fonts.bold, fontSize: 12, color: colors.heading, marginTop: 1 },
 
   chipsWrap: { paddingTop: spacing(1.5) },
   chips: { gap: spacing(1), paddingHorizontal: spacing(2.5) },
