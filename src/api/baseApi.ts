@@ -424,8 +424,14 @@ export type AdminRider = {
   id: number;
   phone: string;
   name: string;
+  email: string;
+  address: string;
+  vehicle_number: string;
   is_on_duty: boolean;
+  is_active: boolean;
   load: number;
+  current_lat: string | null;
+  current_lng: string | null;
 };
 
 export type AdminOrderDetail = {
@@ -575,7 +581,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -982,6 +988,14 @@ export const api = createApi({
     }),
     adminRiders: build.query<AdminRider[], void>({
       query: () => "/admin/riders/",
+      providesTags: ["AdminRider"],
+    }),
+    adminCreateRider: build.mutation<
+      AdminRider,
+      { phone: string; name?: string; email?: string; address?: string; vehicle_number?: string }
+    >({
+      query: (body) => ({ url: "/admin/riders/", method: "POST", body }),
+      invalidatesTags: ["AdminRider"],
     }),
     adminOrderDetail: build.query<AdminOrderDetail, string>({
       query: (orderNumber) => `/admin/orders/${orderNumber}/`,
@@ -1161,6 +1175,7 @@ export const {
   useAdminConfirmOrderMutation,
   useAdminCancelOrderMutation,
   useAdminAssignOrderMutation,
+  useAdminCreateRiderMutation,
   useAdminOrderDetailQuery,
   useAdminCategoriesQuery,
   useAdminCreateCategoryMutation,
