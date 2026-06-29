@@ -7,6 +7,7 @@ import AdminInventoryScreen from "../screens/admin/AdminInventoryScreen";
 import AdminOrdersScreen from "../screens/admin/AdminOrdersScreen";
 import AdminPlaceholderScreen from "../screens/admin/AdminPlaceholderScreen";
 import AdminProductEditScreen from "../screens/admin/AdminProductEditScreen";
+import AdminPromotionsScreen from "../screens/admin/AdminPromotionsScreen";
 import AdminRidersScreen from "../screens/admin/AdminRidersScreen";
 
 export type AdminStackParamList = {
@@ -17,6 +18,7 @@ export type AdminStackParamList = {
   AdminDashboard: undefined;
   AdminInventory: undefined;
   AdminRiders: undefined;
+  AdminPromotions: undefined;
   AdminSection: { key: string; title: string };
 };
 
@@ -34,6 +36,7 @@ export default function AdminStack() {
       <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AdminInventory" component={AdminInventoryScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AdminRiders" component={AdminRidersScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="AdminPromotions" component={AdminPromotionsScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AdminSection" component={AdminPlaceholderScreen} options={{ animation: "slide_from_right" }} />
     </Stack.Navigator>
   );

@@ -500,6 +500,36 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Promotions (apps/promotions)
+export type AdminCoupon = {
+  id: number;
+  code: string;
+  description: string;
+  discount_type: "flat" | "percent";
+  value: string;
+  min_order_value: string;
+  max_discount: string | null;
+  usage_limit: number | null;
+  per_user_limit: number;
+  first_order_only: boolean;
+  valid_from: string;
+  valid_until: string;
+  is_active: boolean;
+  times_used: number;
+  created_at: string;
+};
+export type AdminBanner = {
+  id: number;
+  title: string;
+  subtitle: string;
+  image_url: string;
+  link_url: string;
+  bg_color: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
 // Inventory (apps/inventory)
 export type LowStockItem = { variant_id: number; sku: string; product_name: string; label: string; stock: number };
 export type LowStockReport = { threshold: number; count: number; variants: LowStockItem[] };
@@ -581,7 +611,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -1103,6 +1133,42 @@ export const api = createApi({
       query: (body) => ({ url: "/inventory/adjust/", method: "POST", body }),
       invalidatesTags: ["AdminInventory", "AdminProduct"],
     }),
+
+    // Promotions — coupons & banners
+    adminCoupons: build.query<AdminCoupon[], void>({
+      query: () => "/admin/promotions/coupons/",
+      transformResponse: (r: AdminCoupon[] | Paginated<AdminCoupon>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminCoupon"],
+    }),
+    adminCreateCoupon: build.mutation<AdminCoupon, Partial<AdminCoupon>>({
+      query: (body) => ({ url: "/admin/promotions/coupons/", method: "POST", body }),
+      invalidatesTags: ["AdminCoupon"],
+    }),
+    adminUpdateCoupon: build.mutation<AdminCoupon, { id: number } & Partial<AdminCoupon>>({
+      query: ({ id, ...body }) => ({ url: `/admin/promotions/coupons/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminCoupon"],
+    }),
+    adminDeleteCoupon: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/promotions/coupons/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminCoupon"],
+    }),
+    adminBanners: build.query<AdminBanner[], void>({
+      query: () => "/admin/promotions/banners/",
+      transformResponse: (r: AdminBanner[] | Paginated<AdminBanner>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminBanner"],
+    }),
+    adminCreateBanner: build.mutation<AdminBanner, Partial<AdminBanner>>({
+      query: (body) => ({ url: "/admin/promotions/banners/", method: "POST", body }),
+      invalidatesTags: ["AdminBanner"],
+    }),
+    adminUpdateBanner: build.mutation<AdminBanner, { id: number } & Partial<AdminBanner>>({
+      query: ({ id, ...body }) => ({ url: `/admin/promotions/banners/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminBanner"],
+    }),
+    adminDeleteBanner: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/promotions/banners/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminBanner"],
+    }),
   }),
 });
 
@@ -1198,4 +1264,12 @@ export const {
   useAdminMovementsQuery,
   useAdminRestockMutation,
   useAdminAdjustStockMutation,
+  useAdminCouponsQuery,
+  useAdminCreateCouponMutation,
+  useAdminUpdateCouponMutation,
+  useAdminDeleteCouponMutation,
+  useAdminBannersQuery,
+  useAdminCreateBannerMutation,
+  useAdminUpdateBannerMutation,
+  useAdminDeleteBannerMutation,
 } = api;
