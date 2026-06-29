@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   useAdminOrderStatusQuery,
@@ -13,28 +14,16 @@ import {
 import { AnimatedBar, DonutChart } from "../../components/Charts";
 import { Screen } from "../../components/Screen";
 import { ListSkeleton } from "../../components/Skeleton";
+import { useToast } from "../../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../../theme";
+import { shareCsv } from "./exportCsv";
 
 const money = (n: number | string) => "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
-const PRESETS: { key: string; label: string }[] = [
-  { key: "7d", label: "7 days" },
-  { key: "30d", label: "30 days" },
-  { key: "month", label: "This month" },
-  { key: "year", label: "This year" },
-];
-
-function rangeFor(preset: string) {
-  const end = new Date();
-  const start = new Date();
-  if (preset === "7d") start.setDate(end.getDate() - 6);
-  else if (preset === "30d") start.setDate(end.getDate() - 29);
-  else if (preset === "month") start.setDate(1);
-  else if (preset === "year") { start.setMonth(0, 1); }
-  return { start: iso(start), end: iso(end) };
-}
+const dayLabel = (d: Date) => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const monthStart = () => { const d = today(); d.setDate(1); return d; };
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Placed",
@@ -44,19 +33,39 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
   returned: "Returned",
 };
+// Same palette the web dashboard uses for the orders-by-status doughnut.
 const STATUS_COLOR: Record<string, string> = {
-  pending: "#b98421",
-  confirmed: colors.green,
-  out_for_delivery: colors.info,
+  pending: "#3f8dfd",
+  confirmed: "#fdc040",
+  out_for_delivery: "#3bb77e",
   delivered: "#29a06a",
-  cancelled: colors.error,
+  cancelled: "#d23f3f",
   returned: "#b46b00",
 };
 
 export default function AdminDashboardScreen() {
   const navigation = useNavigation();
-  const [preset, setPreset] = useState("30d");
-  const range = useMemo(() => rangeFor(preset), [preset]);
+  const toast = useToast();
+  // Default to this month → today; editable via the From/To calendar buttons.
+  const [start, setStart] = useState<Date>(monthStart());
+  const [end, setEnd] = useState<Date>(today());
+  const [picker, setPicker] = useState<"start" | "end" | null>(null);
+  const range = useMemo(() => ({ start: iso(start), end: iso(end) }), [start, end]);
+
+  function onPick(e: DateTimePickerEvent, d?: Date) {
+    const which = picker;
+    setPicker(null);
+    if (e.type !== "set" || !d) return;
+    const picked = new Date(d);
+    picked.setHours(0, 0, 0, 0);
+    if (which === "start") {
+      setStart(picked);
+      if (iso(picked) > iso(end)) setEnd(picked);
+    } else if (which === "end") {
+      setEnd(picked);
+      if (iso(picked) < iso(start)) setStart(picked);
+    }
+  }
 
   const sales = useAdminSalesQuery(range);
   const status = useAdminOrderStatusQuery(range);
@@ -79,6 +88,38 @@ export default function AdminDashboardScreen() {
   }));
   const topMax = Math.max(1, ...(top.data ?? []).map((t) => t.quantity));
 
+  async function onExport() {
+    const rows: (string | number)[][] = [
+      ["MilkKart Dashboard", `${range.start} to ${range.end}`],
+      [],
+      ["Metric", "Value"],
+      ["Orders", sales.data?.orders ?? 0],
+      ["Revenue", sales.data?.revenue ?? "0"],
+      ["Avg order value", sales.data?.average_order_value ?? "0"],
+      [],
+      ["Orders by status", "Orders"],
+      ...statusRows.map(([k, v]) => [STATUS_LABEL[k] || k, v]),
+      [],
+      ["Top products", "Units", "Revenue"],
+      ...(top.data ?? []).map((t) => [t.product_name, t.quantity, t.revenue]),
+      [],
+      ["Subscriptions", "Value"],
+      ["Active", subs.data?.active ?? 0],
+      ["Paused", subs.data?.paused ?? 0],
+      ["Cancelled", subs.data?.cancelled ?? 0],
+      ["New in period", subs.data?.new_in_period ?? 0],
+      ["Cancelled in period", subs.data?.cancelled_in_period ?? 0],
+      [],
+      ["Rider", "Delivered", "Assignments", "Avg rating"],
+      ...(riders.data ?? []).map((r) => [r.rider, r.delivered, r.assignments, r.avg_rider_rating ?? ""]),
+    ];
+    try {
+      await shareCsv(`dashboard-${range.start}_to_${range.end}.csv`, rows);
+    } catch {
+      toast("Couldn't export the CSV.", "error");
+    }
+  }
+
   return (
     <Screen padded={false}>
       <View style={styles.header}>
@@ -88,22 +129,44 @@ export default function AdminDashboardScreen() {
             <Ionicons name="arrow-back" size={20} color={colors.white} />
           </Pressable>
           <Text style={styles.headerTitle}>Dashboard</Text>
+          <Pressable style={styles.exportBtn} onPress={onExport} hitSlop={8}>
+            <Ionicons name="download-outline" size={15} color={colors.green} />
+            <Text style={styles.exportText}>CSV</Text>
+          </Pressable>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presets}>
-          {PRESETS.map((p) => {
-            const active = preset === p.key;
-            return (
-              <Text
-                key={p.key}
-                onPress={() => setPreset(p.key)}
-                style={[styles.preset, active && styles.presetActive]}
-              >
-                {p.label}
-              </Text>
-            );
-          })}
-        </ScrollView>
       </View>
+
+      {/* Date filter — From/To rounded calendar buttons (same as Orders). */}
+      <View style={styles.dateBar}>
+        <Pressable style={styles.dateBtn} onPress={() => setPicker("start")}>
+          <View style={styles.calIcon}>
+            <Ionicons name="calendar-outline" size={13} color={colors.green} />
+          </View>
+          <View style={styles.dateText}>
+            <Text style={styles.dateCaption}>FROM</Text>
+            <Text style={styles.dateValue} numberOfLines={1}>{dayLabel(start)}</Text>
+          </View>
+        </Pressable>
+        <Pressable style={styles.dateBtn} onPress={() => setPicker("end")}>
+          <View style={styles.calIcon}>
+            <Ionicons name="calendar-outline" size={13} color={colors.green} />
+          </View>
+          <View style={styles.dateText}>
+            <Text style={styles.dateCaption}>TO</Text>
+            <Text style={styles.dateValue} numberOfLines={1}>{dayLabel(end)}</Text>
+          </View>
+        </Pressable>
+      </View>
+
+      {picker ? (
+        <DateTimePicker
+          value={picker === "start" ? start : end}
+          mode="date"
+          display={Platform.OS === "ios" ? "inline" : "calendar"}
+          maximumDate={today()}
+          onChange={onPick}
+        />
+      ) : null}
 
       {loading ? (
         <ListSkeleton rows={5} thumb={false} />
@@ -220,10 +283,17 @@ const styles = StyleSheet.create({
   blob: { position: "absolute", top: -45, right: -30, width: 150, height: 150, borderRadius: 75, backgroundColor: "rgba(255,255,255,0.06)" },
   headerRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.5) },
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.white },
-  presets: { gap: spacing(1), paddingTop: spacing(2) },
-  preset: { fontFamily: fonts.bold, fontSize: 13, color: "rgba(255,255,255,0.75)", paddingVertical: spacing(0.75), paddingHorizontal: spacing(1.75), borderRadius: 999, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
-  presetActive: { color: colors.heading, backgroundColor: colors.white },
+  headerTitle: { flex: 1, fontFamily: fonts.bold, fontSize: 22, color: colors.white },
+  exportBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.white, borderRadius: 10, paddingVertical: spacing(0.75), paddingHorizontal: spacing(1.25) },
+  exportText: { fontFamily: fonts.bold, fontSize: 13, color: colors.green },
+
+  // Date filter — compact rounded-square calendar buttons (matches Orders)
+  dateBar: { flexDirection: "row", alignItems: "stretch", gap: spacing(0.75), paddingHorizontal: spacing(2.5), paddingTop: spacing(2) },
+  dateBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing(0.75), backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingVertical: spacing(0.75), paddingHorizontal: spacing(1) },
+  calIcon: { width: 24, height: 24, borderRadius: 8, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
+  dateText: { flex: 1, minWidth: 0 },
+  dateCaption: { fontFamily: fontsAlt.extrabold, fontSize: 8, letterSpacing: 0.6, color: colors.muted },
+  dateValue: { fontFamily: fonts.bold, fontSize: 12, color: colors.heading, marginTop: 1 },
 
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(5) },
 

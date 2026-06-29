@@ -424,8 +424,14 @@ export type AdminRider = {
   id: number;
   phone: string;
   name: string;
+  email: string;
+  address: string;
+  vehicle_number: string;
   is_on_duty: boolean;
+  is_active: boolean;
   load: number;
+  current_lat: string | null;
+  current_lng: string | null;
 };
 
 export type AdminOrderDetail = {
@@ -494,6 +500,128 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Serviceability admin (apps/serviceability)
+export type ServiceableArea = {
+  id: number;
+  pincode: string;
+  area_name: string;
+  city: string;
+  is_active: boolean;
+  delivery_eta_minutes: number | null;
+  center_lat: string | null;
+  center_lng: string | null;
+  radius_km: string | null;
+  has_geofence: boolean;
+  created_at: string;
+  updated_at: string;
+};
+export type DeliveryZone = {
+  id: number;
+  name: string;
+  city: string;
+  state: string;
+  polygon: { type: string; coordinates: unknown };
+  is_active: boolean;
+  delivery_eta_minutes: number | null;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+};
+
+// Subscriptions admin (apps/subscriptions)
+export type ForecastSku = { variant_id: number; sku: string; product: string; label: string; units: number; stops: number; value: string };
+export type ForecastStop = {
+  customer_name: string;
+  customer_phone: string;
+  address: string;
+  city: string;
+  pincode: string;
+  product: string;
+  label: string;
+  quantity: number;
+  preferred_time: string | null;
+};
+export type SubscriptionForecast = {
+  date: string;
+  total_units: number;
+  total_stops: number;
+  total_value: string;
+  by_sku: ForecastSku[];
+  stops: ForecastStop[];
+};
+export type AdminVacation = {
+  subscription_id: number;
+  vacation_id: number;
+  customer_name: string;
+  customer_phone: string;
+  product: string;
+  label: string;
+  start_date: string;
+  end_date: string;
+  active: boolean;
+};
+export type VacationsReport = { date: string; count: number; vacations: AdminVacation[] };
+
+// Store settings (apps/core StoreConfig)
+export type StoreSettings = {
+  free_delivery_threshold: string;
+  delivery_fee: string;
+  small_cart_threshold: string;
+  small_cart_fee: string;
+  tax_percent: string;
+  next_day_enabled: boolean;
+  next_day_window_start: string; // "HH:MM:SS"
+  next_day_window_end: string;
+  updated_at: string;
+};
+
+// Promotions (apps/promotions)
+export type AdminCoupon = {
+  id: number;
+  code: string;
+  description: string;
+  discount_type: "flat" | "percent";
+  value: string;
+  min_order_value: string;
+  max_discount: string | null;
+  usage_limit: number | null;
+  per_user_limit: number;
+  first_order_only: boolean;
+  valid_from: string;
+  valid_until: string;
+  is_active: boolean;
+  times_used: number;
+  created_at: string;
+};
+export type AdminBanner = {
+  id: number;
+  title: string;
+  subtitle: string;
+  image_url: string;
+  link_url: string;
+  bg_color: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
+// Inventory (apps/inventory)
+export type LowStockItem = { variant_id: number; sku: string; product_name: string; label: string; stock: number };
+export type LowStockReport = { threshold: number; count: number; variants: LowStockItem[] };
+export type StockMovement = {
+  id: number;
+  variant: number;
+  sku: string;
+  product_name: string;
+  delta: number;
+  reason: string;
+  balance_after: number;
+  note: string;
+  order_number: string | null;
+  created_by_phone: string | null;
+  created_at: string;
+};
+
 // Dashboard reports (apps/reports)
 export type DateRange = { start: string; end: string };
 export type SalesReport = { start: string; end: string; orders: number; revenue: string; average_order_value: string };
@@ -558,7 +686,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner", "AdminSettings", "AdminArea", "AdminZone"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -965,6 +1093,14 @@ export const api = createApi({
     }),
     adminRiders: build.query<AdminRider[], void>({
       query: () => "/admin/riders/",
+      providesTags: ["AdminRider"],
+    }),
+    adminCreateRider: build.mutation<
+      AdminRider,
+      { phone: string; name?: string; email?: string; address?: string; vehicle_number?: string }
+    >({
+      query: (body) => ({ url: "/admin/riders/", method: "POST", body }),
+      invalidatesTags: ["AdminRider"],
     }),
     adminOrderDetail: build.query<AdminOrderDetail, string>({
       query: (orderNumber) => `/admin/orders/${orderNumber}/`,
@@ -1053,6 +1189,111 @@ export const api = createApi({
     adminRiderReport: build.query<RiderPerf[], DateRange>({
       query: ({ start, end }) => `/reports/riders/?start=${start}&end=${end}`,
     }),
+
+    // Inventory (low-stock, movements, restock/adjust)
+    adminLowStock: build.query<LowStockReport, number | void>({
+      query: (threshold) => `/inventory/low-stock/${threshold ? `?threshold=${threshold}` : ""}`,
+      providesTags: ["AdminInventory"],
+    }),
+    adminMovements: build.query<StockMovement[], void>({
+      query: () => "/inventory/movements/",
+      transformResponse: (r: StockMovement[] | Paginated<StockMovement>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminInventory"],
+    }),
+    adminRestock: build.mutation<StockMovement, { variant_id: number; quantity: number; note?: string }>({
+      query: (body) => ({ url: "/inventory/restock/", method: "POST", body }),
+      invalidatesTags: ["AdminInventory", "AdminProduct"],
+    }),
+    adminAdjustStock: build.mutation<StockMovement, { variant_id: number; delta: number; reason: string; note?: string }>({
+      query: (body) => ({ url: "/inventory/adjust/", method: "POST", body }),
+      invalidatesTags: ["AdminInventory", "AdminProduct"],
+    }),
+
+    // Promotions — coupons & banners
+    adminCoupons: build.query<AdminCoupon[], void>({
+      query: () => "/admin/promotions/coupons/",
+      transformResponse: (r: AdminCoupon[] | Paginated<AdminCoupon>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminCoupon"],
+    }),
+    adminCreateCoupon: build.mutation<AdminCoupon, Partial<AdminCoupon>>({
+      query: (body) => ({ url: "/admin/promotions/coupons/", method: "POST", body }),
+      invalidatesTags: ["AdminCoupon"],
+    }),
+    adminUpdateCoupon: build.mutation<AdminCoupon, { id: number } & Partial<AdminCoupon>>({
+      query: ({ id, ...body }) => ({ url: `/admin/promotions/coupons/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminCoupon"],
+    }),
+    adminDeleteCoupon: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/promotions/coupons/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminCoupon"],
+    }),
+    adminBanners: build.query<AdminBanner[], void>({
+      query: () => "/admin/promotions/banners/",
+      transformResponse: (r: AdminBanner[] | Paginated<AdminBanner>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminBanner"],
+    }),
+    adminCreateBanner: build.mutation<AdminBanner, Partial<AdminBanner>>({
+      query: (body) => ({ url: "/admin/promotions/banners/", method: "POST", body }),
+      invalidatesTags: ["AdminBanner"],
+    }),
+    adminUpdateBanner: build.mutation<AdminBanner, { id: number } & Partial<AdminBanner>>({
+      query: ({ id, ...body }) => ({ url: `/admin/promotions/banners/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminBanner"],
+    }),
+    adminDeleteBanner: build.mutation<void, number>({
+      query: (id) => ({ url: `/admin/promotions/banners/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminBanner"],
+    }),
+
+    // Store settings (fees + next-day ordering window)
+    adminSettings: build.query<StoreSettings, void>({
+      query: () => "/admin/settings/",
+      providesTags: ["AdminSettings"],
+    }),
+    adminUpdateSettings: build.mutation<StoreSettings, Partial<StoreSettings>>({
+      query: (body) => ({ url: "/admin/settings/", method: "PUT", body }),
+      invalidatesTags: ["AdminSettings"],
+    }),
+
+    // Subscriptions — demand forecast + route sheet, and active vacations
+    adminSubscriptionForecast: build.query<SubscriptionForecast, string | void>({
+      query: (date) => `/admin/subscriptions/forecast/${date ? `?date=${date}` : ""}`,
+    }),
+    adminSubscriptionVacations: build.query<VacationsReport, void>({
+      query: () => "/admin/subscriptions/vacations/",
+    }),
+
+    // Serviceability — pincode areas (CRUD) + map-drawn delivery zones (read/toggle)
+    adminAreas: build.query<ServiceableArea[], void>({
+      query: () => "/serviceability/areas/",
+      transformResponse: (r: ServiceableArea[] | Paginated<ServiceableArea>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminArea"],
+    }),
+    adminCreateArea: build.mutation<ServiceableArea, Partial<ServiceableArea>>({
+      query: (body) => ({ url: "/serviceability/areas/", method: "POST", body }),
+      invalidatesTags: ["AdminArea"],
+    }),
+    adminUpdateArea: build.mutation<ServiceableArea, { id: number } & Partial<ServiceableArea>>({
+      query: ({ id, ...body }) => ({ url: `/serviceability/areas/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminArea"],
+    }),
+    adminDeleteArea: build.mutation<void, number>({
+      query: (id) => ({ url: `/serviceability/areas/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminArea"],
+    }),
+    adminZones: build.query<DeliveryZone[], void>({
+      query: () => "/serviceability/zones/",
+      transformResponse: (r: DeliveryZone[] | Paginated<DeliveryZone>) => (Array.isArray(r) ? r : r.results),
+      providesTags: ["AdminZone"],
+    }),
+    adminUpdateZone: build.mutation<DeliveryZone, { id: number } & Partial<DeliveryZone>>({
+      query: ({ id, ...body }) => ({ url: `/serviceability/zones/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminZone"],
+    }),
+    adminDeleteZone: build.mutation<void, number>({
+      query: (id) => ({ url: `/serviceability/zones/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminZone"],
+    }),
   }),
 });
 
@@ -1125,6 +1366,7 @@ export const {
   useAdminConfirmOrderMutation,
   useAdminCancelOrderMutation,
   useAdminAssignOrderMutation,
+  useAdminCreateRiderMutation,
   useAdminOrderDetailQuery,
   useAdminCategoriesQuery,
   useAdminCreateCategoryMutation,
@@ -1143,4 +1385,27 @@ export const {
   useAdminTopProductsQuery,
   useAdminSubscriptionReportQuery,
   useAdminRiderReportQuery,
+  useAdminLowStockQuery,
+  useAdminMovementsQuery,
+  useAdminRestockMutation,
+  useAdminAdjustStockMutation,
+  useAdminCouponsQuery,
+  useAdminCreateCouponMutation,
+  useAdminUpdateCouponMutation,
+  useAdminDeleteCouponMutation,
+  useAdminBannersQuery,
+  useAdminCreateBannerMutation,
+  useAdminUpdateBannerMutation,
+  useAdminDeleteBannerMutation,
+  useAdminSettingsQuery,
+  useAdminUpdateSettingsMutation,
+  useAdminSubscriptionForecastQuery,
+  useAdminSubscriptionVacationsQuery,
+  useAdminAreasQuery,
+  useAdminCreateAreaMutation,
+  useAdminUpdateAreaMutation,
+  useAdminDeleteAreaMutation,
+  useAdminZonesQuery,
+  useAdminUpdateZoneMutation,
+  useAdminDeleteZoneMutation,
 } = api;
