@@ -500,6 +500,19 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Store settings (apps/core StoreConfig)
+export type StoreSettings = {
+  free_delivery_threshold: string;
+  delivery_fee: string;
+  small_cart_threshold: string;
+  small_cart_fee: string;
+  tax_percent: string;
+  next_day_enabled: boolean;
+  next_day_window_start: string; // "HH:MM:SS"
+  next_day_window_end: string;
+  updated_at: string;
+};
+
 // Promotions (apps/promotions)
 export type AdminCoupon = {
   id: number;
@@ -611,7 +624,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner", "AdminSettings"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -1169,6 +1182,16 @@ export const api = createApi({
       query: (id) => ({ url: `/admin/promotions/banners/${id}/`, method: "DELETE" }),
       invalidatesTags: ["AdminBanner"],
     }),
+
+    // Store settings (fees + next-day ordering window)
+    adminSettings: build.query<StoreSettings, void>({
+      query: () => "/admin/settings/",
+      providesTags: ["AdminSettings"],
+    }),
+    adminUpdateSettings: build.mutation<StoreSettings, Partial<StoreSettings>>({
+      query: (body) => ({ url: "/admin/settings/", method: "PUT", body }),
+      invalidatesTags: ["AdminSettings"],
+    }),
   }),
 });
 
@@ -1272,4 +1295,6 @@ export const {
   useAdminCreateBannerMutation,
   useAdminUpdateBannerMutation,
   useAdminDeleteBannerMutation,
+  useAdminSettingsQuery,
+  useAdminUpdateSettingsMutation,
 } = api;
