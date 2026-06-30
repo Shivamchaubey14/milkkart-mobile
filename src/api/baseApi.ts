@@ -1118,6 +1118,13 @@ export const api = createApi({
       query: (body) => ({ url: "/admin/riders/", method: "POST", body }),
       invalidatesTags: ["AdminRider"],
     }),
+    adminUpdateRider: build.mutation<
+      AdminRider,
+      { id: number; name?: string; email?: string; address?: string; vehicle_number?: string; is_active?: boolean }
+    >({
+      query: ({ id, ...body }) => ({ url: `/admin/riders/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminRider"],
+    }),
     adminOrderDetail: build.query<AdminOrderDetail, string>({
       query: (orderNumber) => `/admin/orders/${orderNumber}/`,
       providesTags: ["AdminOrder"],
@@ -1402,6 +1409,7 @@ export const {
   useAdminCancelOrderMutation,
   useAdminAssignOrderMutation,
   useAdminCreateRiderMutation,
+  useAdminUpdateRiderMutation,
   useAdminOrderDetailQuery,
   useAdminCategoriesQuery,
   useAdminCreateCategoryMutation,
