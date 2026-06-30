@@ -77,9 +77,9 @@ export default function AdminSubscriptionsScreen() {
               refreshControl={<RefreshControl refreshing={forecast.isFetching} onRefresh={forecast.refetch} tintColor={colors.green} colors={[colors.green]} />}
             >
               <View style={styles.kpiRow}>
-                <Kpi value={String(f?.total_units ?? 0)} label="Units" icon="cube-outline" />
-                <Kpi value={String(f?.total_stops ?? 0)} label="Stops" icon="location-outline" />
-                <Kpi value={money(f?.total_value ?? 0)} label="Value" icon="cash-outline" />
+                <Kpi value={String(f?.total_units ?? 0)} label="Units" icon="cube-outline" tint={colors.greenTint} fg={colors.green} />
+                <Kpi value={String(f?.total_stops ?? 0)} label="Stops" icon="location-outline" tint="#e8f2fc" fg={colors.info} />
+                <Kpi value={money(f?.total_value ?? 0)} label="Value" icon="cash-outline" tint="#fff4d6" fg="#b98421" />
               </View>
 
               <Text style={styles.section}>BY PRODUCT</Text>
@@ -166,11 +166,27 @@ export default function AdminSubscriptionsScreen() {
   );
 }
 
-function Kpi({ value, label, icon }: { value: string; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }) {
+function Kpi({
+  value,
+  label,
+  icon,
+  tint,
+  fg,
+}: {
+  value: string;
+  label: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  tint: string;
+  fg: string;
+}) {
   return (
-    <View style={styles.kpi}>
-      <Ionicons name={icon} size={16} color={colors.green} />
-      <Text style={styles.kpiValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+    <View style={[styles.kpi, { backgroundColor: tint }]}>
+      <View style={[styles.kpiIcon, { backgroundColor: colors.white }]}>
+        <Ionicons name={icon} size={15} color={fg} />
+      </View>
+      <Text style={[styles.kpiValue, { color: fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {value}
+      </Text>
       <Text style={styles.kpiLabel}>{label}</Text>
     </View>
   );
@@ -199,12 +215,13 @@ const styles = StyleSheet.create({
 
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(5) },
   kpiRow: { flexDirection: "row", gap: spacing(1.25) },
-  kpi: { flex: 1, backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), alignItems: "flex-start" },
-  kpiValue: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading, marginTop: spacing(0.75) },
-  kpiLabel: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted, marginTop: 2 },
+  kpi: { flex: 1, borderRadius: 16, padding: spacing(1.5), alignItems: "flex-start", shadowColor: "#1c2b36", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  kpiIcon: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: spacing(1.25) },
+  kpiValue: { alignSelf: "stretch", fontFamily: fonts.bold, fontSize: 19 },
+  kpiLabel: { fontFamily: fonts.semibold, fontSize: 11, color: colors.heading, marginTop: 3 },
 
   section: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 0.8, color: colors.muted, marginTop: spacing(2.5), marginBottom: spacing(1) },
-  card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, paddingHorizontal: spacing(1.75) },
+  card: { backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, paddingHorizontal: spacing(1.75), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   empty: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, paddingVertical: spacing(1.5), textAlign: "center" },
   skuRow: { flexDirection: "row", alignItems: "center", paddingVertical: spacing(1.5) },
   skuBorder: { borderTopWidth: 1, borderTopColor: colors.lineSoft },
