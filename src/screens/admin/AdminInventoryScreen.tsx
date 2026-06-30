@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -186,49 +188,55 @@ function StockSheet({ item, onClose }: { item: LowStockItem; onClose: () => void
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={sheet.backdrop} onPress={onClose} />
-      <View style={sheet.sheet}>
-        <View style={sheet.handle} />
-        <Text style={sheet.title} numberOfLines={1}>{item.product_name}</Text>
-        <Text style={sheet.sub}>{item.label} · in stock: {item.stock}</Text>
+      <View style={sheet.root}>
+        <Pressable style={sheet.backdrop} onPress={onClose} />
+        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={Platform.OS === "android" ? -spacing(2) : 0}>
+          <View style={[sheet.sheet, { maxHeight: "88%" }]}>
+            <View style={sheet.handle} />
+            <Text style={sheet.title} numberOfLines={1}>{item.product_name}</Text>
+            <Text style={sheet.sub}>{item.label} · in stock: {item.stock}</Text>
 
-        <View style={sheet.modeRow}>
-          {(["restock", "adjust"] as const).map((m) => (
-            <Pressable key={m} onPress={() => setMode(m)} style={[sheet.modeBtn, mode === m && sheet.modeBtnActive]}>
-              <Text style={[sheet.modeText, mode === m && sheet.modeTextActive]}>{m === "restock" ? "Add stock" : "Adjust"}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {mode === "restock" ? (
-          <>
-            <Text style={sheet.label}>Units to add</Text>
-            <TextInput style={sheet.input} value={qty} onChangeText={setQty} keyboardType="number-pad" placeholder="e.g. 50" placeholderTextColor={colors.muted} />
-          </>
-        ) : (
-          <>
-            <Text style={sheet.label}>Change (use − to remove)</Text>
-            <TextInput style={sheet.input} value={delta} onChangeText={setDelta} keyboardType="numbers-and-punctuation" placeholder="e.g. -3" placeholderTextColor={colors.muted} />
-            <Text style={sheet.label}>Reason</Text>
-            <View style={sheet.reasonRow}>
-              {(["adjustment", "damage"] as const).map((r) => (
-                <Pressable key={r} onPress={() => setReason(r)} style={[sheet.reasonChip, reason === r && sheet.reasonChipActive]}>
-                  <Text style={[sheet.reasonText, reason === r && sheet.reasonTextActive]}>{r === "adjustment" ? "Manual adjustment" : "Damage / wastage"}</Text>
+            <View style={sheet.modeRow}>
+              {(["restock", "adjust"] as const).map((m) => (
+                <Pressable key={m} onPress={() => setMode(m)} style={[sheet.modeBtn, mode === m && sheet.modeBtnActive]}>
+                  <Text style={[sheet.modeText, mode === m && sheet.modeTextActive]}>{m === "restock" ? "Add stock" : "Adjust"}</Text>
                 </Pressable>
               ))}
             </View>
-          </>
-        )}
 
-        <Text style={sheet.label}>Note (optional)</Text>
-        <TextInput style={sheet.input} value={note} onChangeText={setNote} placeholder="Reason / reference" placeholderTextColor={colors.muted} />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {mode === "restock" ? (
+                <>
+                  <Text style={sheet.label}>Units to add</Text>
+                  <TextInput style={sheet.input} value={qty} onChangeText={setQty} keyboardType="number-pad" placeholder="e.g. 50" placeholderTextColor={colors.muted} />
+                </>
+              ) : (
+                <>
+                  <Text style={sheet.label}>Change (use − to remove)</Text>
+                  <TextInput style={sheet.input} value={delta} onChangeText={setDelta} keyboardType="numbers-and-punctuation" placeholder="e.g. -3" placeholderTextColor={colors.muted} />
+                  <Text style={sheet.label}>Reason</Text>
+                  <View style={sheet.reasonRow}>
+                    {(["adjustment", "damage"] as const).map((r) => (
+                      <Pressable key={r} onPress={() => setReason(r)} style={[sheet.reasonChip, reason === r && sheet.reasonChipActive]}>
+                        <Text style={[sheet.reasonText, reason === r && sheet.reasonTextActive]}>{r === "adjustment" ? "Manual adjustment" : "Damage / wastage"}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
 
-        <View style={sheet.actions}>
-          <Pressable style={[sheet.btn, sheet.btnGhost]} onPress={onClose}><Text style={sheet.btnGhostText}>Cancel</Text></Pressable>
-          <Pressable style={[sheet.btn, sheet.btnPrimary, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}>
-            <Text style={sheet.btnPrimaryText}>{saving ? "Saving…" : "Save"}</Text>
-          </Pressable>
-        </View>
+              <Text style={sheet.label}>Note (optional)</Text>
+              <TextInput style={sheet.input} value={note} onChangeText={setNote} placeholder="Reason / reference" placeholderTextColor={colors.muted} />
+            </ScrollView>
+
+            <View style={sheet.actions}>
+              <Pressable style={[sheet.btn, sheet.btnGhost]} onPress={onClose}><Text style={sheet.btnGhostText}>Cancel</Text></Pressable>
+              <Pressable style={[sheet.btn, sheet.btnPrimary, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}>
+                <Text style={sheet.btnPrimaryText}>{saving ? "Saving…" : "Save"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -281,8 +289,9 @@ const styles = StyleSheet.create({
 });
 
 const sheet = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: spacing(2.5), paddingTop: spacing(1.25), paddingBottom: spacing(3) },
+  root: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, borderTopWidth: 1, borderColor: colors.line, paddingHorizontal: spacing(2.5), paddingTop: spacing(1.25), paddingBottom: spacing(3), shadowColor: "#1c2b36", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: -4 }, elevation: 16 },
   handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(1.5) },
   title: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading },
   sub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, marginTop: 2 },
