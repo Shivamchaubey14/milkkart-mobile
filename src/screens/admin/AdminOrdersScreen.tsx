@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { ActivityIndicator, Alert, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import {
   AdminOrder,
@@ -58,6 +58,7 @@ export default function AdminOrdersScreen() {
   const [end, setEnd] = useState<Date>(today());
   const [picker, setPicker] = useState<"start" | "end" | null>(null);
   const [selected, setSelected] = useState<string | null>(null); // order_number for the detail sheet
+  const [query, setQuery] = useState("");
   const isToday = iso(start) === iso(today()) && iso(end) === iso(today());
 
   const { data: orders, isLoading, isFetching, refetch } = useAdminOrdersQuery(
@@ -92,6 +93,17 @@ export default function AdminOrdersScreen() {
     }
   }
 
+  // Client-side search across order #, customer name/phone and address.
+  const q = query.trim().toLowerCase();
+  const visible = (orders ?? []).filter(
+    (o) =>
+      !q ||
+      o.order_number.toLowerCase().includes(q) ||
+      (o.customer_name || "").toLowerCase().includes(q) ||
+      (o.customer_phone || "").toLowerCase().includes(q) ||
+      (o.address_snapshot || "").toLowerCase().includes(q),
+  );
+
   const onConfirm = (o: AdminOrder) => run(confirmOrder(o.order_number).unwrap(), "Order confirmed");
   const onAssign = (o: AdminOrder) => run(assignOrder({ orderNumber: o.order_number }).unwrap(), "Rider assigned");
   const onCancel = (o: AdminOrder) =>
@@ -109,6 +121,23 @@ export default function AdminOrdersScreen() {
             <Ionicons name="arrow-back" size={20} color={colors.white} />
           </Pressable>
           <Text style={styles.headerTitle}>Orders</Text>
+        </View>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={17} color={colors.muted} />
+          <TextInput
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search order #, customer or address"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {query ? (
+            <Pressable onPress={() => setQuery("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={17} color={colors.muted} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -167,57 +196,71 @@ export default function AdminOrdersScreen() {
             <RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.green} colors={[colors.green]} />
           }
         >
-          {!orders || orders.length === 0 ? (
+          {visible.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.emptyBadge}>
-                <Ionicons name="receipt-outline" size={30} color={colors.green} />
+                <Ionicons name={q ? "search-outline" : "receipt-outline"} size={30} color={colors.green} />
               </View>
-              <Text style={styles.emptyTitle}>No orders</Text>
+              <Text style={styles.emptyTitle}>{q ? "No matches" : "No orders"}</Text>
               <Text style={styles.emptySub}>
-                {isToday ? "No orders today yet." : "No orders for the selected dates."}
-                {filter ? " Try a different status." : ""}
+                {q
+                  ? `Nothing matches “${query.trim()}”.`
+                  : isToday
+                    ? "No orders today yet."
+                    : "No orders for the selected dates."}
+                {!q && filter ? " Try a different status." : ""}
               </Text>
             </View>
           ) : (
-            orders.map((o) => {
+            visible.map((o) => {
               const s = statusOf(o.status);
+              const canAct = o.status === "pending" || (o.status === "confirmed" && !o.rider);
               return (
                 <Pressable
                   key={o.order_number}
-                  style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+                  style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
                   onPress={() => setSelected(o.order_number)}
                 >
                   <View style={styles.cardTop}>
-                    <Text style={styles.orderNo}>#{o.order_number.slice(0, 8)}</Text>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{(o.customer_name?.trim()?.[0] || "C").toUpperCase()}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.customer}>{o.customer_name?.trim() || "Customer"}</Text>
+                      <Text style={styles.phone}>{o.customer_phone}</Text>
+                    </View>
                     <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
                       <Text style={[styles.statusText, { color: s.fg }]}>{s.label}</Text>
                     </View>
                   </View>
 
-                  <Text style={styles.customer} numberOfLines={1}>
-                    {(o.customer_name?.trim() || "Customer")} · {o.customer_phone}
-                  </Text>
-                  {o.address_snapshot ? (
-                    <Text style={styles.addr} numberOfLines={2}>{o.address_snapshot}</Text>
-                  ) : null}
-
-                  <View style={styles.metaRow}>
-                    <Text style={styles.meta}>
-                      {o.item_count} {o.item_count === 1 ? "item" : "items"}
-                    </Text>
-                    <Text style={styles.total}>{money(o.total)}</Text>
+                  <View style={styles.orderLine}>
+                    <Text style={styles.orderNo}>#{o.order_number.slice(0, 8)}</Text>
+                    <Text style={styles.sep}>·</Text>
+                    <Text style={styles.meta}>{o.item_count} {o.item_count === 1 ? "item" : "items"}</Text>
                   </View>
 
-                  {o.rider ? (
-                    <View style={styles.riderRow}>
-                      <Ionicons name="bicycle-outline" size={14} color={colors.muted} />
-                      <Text style={styles.riderText}>
-                        {o.rider.phone} · {o.rider.status.replace(/_/g, " ")}
-                      </Text>
+                  {o.address_snapshot ? (
+                    <View style={styles.addrRow}>
+                      <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginTop: 1 }} />
+                      <Text style={styles.addr}>{o.address_snapshot}</Text>
                     </View>
                   ) : null}
 
-                  {o.status === "pending" || (o.status === "confirmed" && !o.rider) ? (
+                  {o.rider ? (
+                    <View style={styles.riderRow}>
+                      <Ionicons name="bicycle-outline" size={14} color={colors.green} />
+                      <Text style={styles.riderText}>{o.rider.phone} · {o.rider.status.replace(/_/g, " ")}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.divider} />
+                  <View style={styles.footer}>
+                    <Text style={styles.totalLabel}>Total</Text>
+                    <Text style={styles.total}>{money(o.total)}</Text>
+                  </View>
+
+                  {canAct ? (
                     <View style={styles.actions}>
                       {o.status === "pending" ? (
                         <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => onConfirm(o)}>
@@ -368,6 +411,8 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.5) },
   back: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
   headerTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.white },
+  searchBar: { flexDirection: "row", alignItems: "center", gap: spacing(1), backgroundColor: colors.white, borderRadius: 12, paddingHorizontal: spacing(1.5), paddingVertical: Platform.OS === "ios" ? spacing(1.25) : spacing(0.5), marginTop: spacing(2) },
+  searchInput: { flex: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.heading, padding: 0 },
 
   // Date filter — compact rounded-square calendar buttons
   dateBar: { flexDirection: "row", alignItems: "stretch", gap: spacing(0.75), paddingHorizontal: spacing(2.5), paddingTop: spacing(2) },
@@ -396,18 +441,26 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.white },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.5) },
-  cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  orderNo: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+  card: { backgroundColor: colors.bg, borderRadius: 18, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.5) },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: spacing(1.25) },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
+  avatarText: { fontFamily: fonts.bold, fontSize: 16, color: colors.green },
+  customer: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+  phone: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 1 },
   statusPill: { borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },
   statusText: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 0.4 },
-  customer: { fontFamily: fonts.semibold, fontSize: 13, color: colors.heading, marginTop: spacing(1) },
-  addr: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 3, lineHeight: 17 },
-  metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(1.25) },
+  orderLine: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing(1.5) },
+  orderNo: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
+  sep: { fontFamily: fonts.bold, fontSize: 13, color: colors.line },
   meta: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted },
-  total: { fontFamily: fonts.bold, fontSize: 15, color: colors.green },
+  addrRow: { flexDirection: "row", gap: 6, marginTop: spacing(1) },
+  addr: { flex: 1, fontFamily: fontsAlt.regular, fontSize: 13, color: colors.text, lineHeight: 19 },
+  total: { fontFamily: fonts.bold, fontSize: 17, color: colors.green },
+  totalLabel: { fontFamily: fonts.semibold, fontSize: 13, color: colors.muted },
   riderRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing(1) },
-  riderText: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.text },
+  riderText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.text },
+  divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: spacing(1.5) },
+  footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(1.25) },
   actions: { flexDirection: "row", gap: spacing(1.25), marginTop: spacing(1.75) },
   btn: { flex: 1, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   btnPrimary: { backgroundColor: colors.green },
