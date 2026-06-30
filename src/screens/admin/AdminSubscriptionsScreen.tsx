@@ -34,7 +34,7 @@ export default function AdminSubscriptionsScreen() {
   const f = forecast.data;
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -213,8 +213,8 @@ const styles = StyleSheet.create({
   skuUnits: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
   skuValue: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.green, marginTop: 2 },
 
-  stopCard: { backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25) },
-  vacCard: { backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25) },
+  stopCard: { backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  vacCard: { backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   stopTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   stopName: { flex: 1, fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
   timePill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#e8f2fc", borderRadius: 8, paddingVertical: 3, paddingHorizontal: 8 },

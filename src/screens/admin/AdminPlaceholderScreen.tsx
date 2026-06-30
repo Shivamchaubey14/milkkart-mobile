@@ -11,7 +11,7 @@ export default function AdminPlaceholderScreen() {
   const { title } = useRoute<RouteProp<AdminStackParamList, "AdminSection">>().params;
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>

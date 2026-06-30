@@ -17,7 +17,7 @@ export default function AdminRidersScreen() {
   const onDuty = (riders ?? []).filter((r) => r.is_on_duty).length;
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   addBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.5), backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.25) },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.5), backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.heading, alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: fonts.bold, fontSize: 18, color: colors.white },
   dutyDot: { position: "absolute", right: -1, bottom: -1, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: colors.bg },

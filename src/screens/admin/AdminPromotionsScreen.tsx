@@ -45,7 +45,7 @@ export default function AdminPromotionsScreen() {
     ]);
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   segTextActive: { color: colors.heading },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.25) },
+  card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   codeWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
   code: { fontFamily: fonts.bold, fontSize: 16, color: colors.heading, letterSpacing: 0.5 },

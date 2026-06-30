@@ -72,7 +72,7 @@ export default function AdminCatalogScreen() {
     ]);
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   segTextActive: { color: colors.heading },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25) },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   thumb: { width: 46, height: 46, borderRadius: 10, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   thumbImg: { width: "100%", height: "100%" },
   rowName: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },

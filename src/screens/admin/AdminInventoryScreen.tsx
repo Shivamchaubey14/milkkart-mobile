@@ -48,7 +48,7 @@ export default function AdminInventoryScreen() {
   const moves = useAdminMovementsQuery();
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   threshChipTextActive: { color: colors.white },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25) },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   rowName: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
   rowMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   stockBadge: { minWidth: 38, alignItems: "center", borderRadius: 9, paddingVertical: 4, paddingHorizontal: 8 },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   stockTextLow: { color: "#b98421" },
   stockTextOut: { color: colors.error },
 
-  moveRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1) },
+  moveRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   moveIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   moveDelta: { fontFamily: fonts.bold, fontSize: 15 },
   moveBalance: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted, marginTop: 1 },

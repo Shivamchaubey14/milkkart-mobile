@@ -121,7 +121,7 @@ export default function AdminDashboardScreen() {
   }
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(5) },
 
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  kpi: { width: "48.5%", backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.5) },
+  kpi: { width: "48.5%", backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.5), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   kpiValue: { fontFamily: fonts.bold, fontSize: 20, color: colors.heading, marginTop: spacing(1) },
   kpiLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
 

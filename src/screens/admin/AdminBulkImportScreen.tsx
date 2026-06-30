@@ -75,7 +75,7 @@ export default function AdminBulkImportScreen() {
   const active = job.data;
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   errMore: { fontFamily: fonts.semibold, fontSize: 12, color: colors.error, marginTop: 2 },
 
   empty: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted },
-  recentRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25) },
+  recentRow: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   recentName: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
   recentMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
 

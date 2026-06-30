@@ -53,7 +53,7 @@ export default function AdminHomeScreen() {
   };
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.blob} />
@@ -109,12 +109,17 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", paddingHorizontal: spacing(2.5), paddingTop: spacing(2.5) },
   card: {
     width: "48.5%",
-    backgroundColor: colors.bgSoft,
+    backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: colors.lineSoft,
     padding: spacing(1.75),
     marginBottom: spacing(2),
+    shadowColor: "#1c2b36",
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   cardIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", marginBottom: spacing(1.25) },
   cardTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },

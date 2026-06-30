@@ -49,7 +49,7 @@ export default function AdminServiceabilityScreen() {
     ]);
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   segTextActive: { color: colors.heading },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25) },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   pinBadge: { backgroundColor: colors.greenTint, borderRadius: 10, paddingVertical: spacing(0.75), paddingHorizontal: spacing(1.25), minWidth: 64, alignItems: "center" },
   pinText: { fontFamily: fonts.bold, fontSize: 13, color: colors.green },
   zoneIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
