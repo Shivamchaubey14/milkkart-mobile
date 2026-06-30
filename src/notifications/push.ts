@@ -55,6 +55,23 @@ export function buzz(): void {
   Vibration.vibrate(VIBRATION_PATTERN);
 }
 
+// Continuous "incoming order" ring — loops the buzz until stopRinging() is
+// called (e.g. the rider taps Accept). Works while the app is running
+// (foreground, or after the rider taps the push to open it). A fully-killed app
+// can't run JS, so the one-shot push-channel vibration is all that fires then.
+const RING_PATTERN = [0, 700, 500];
+let ringing = false;
+export function startRinging(): void {
+  if (ringing) return;
+  ringing = true;
+  Vibration.vibrate(RING_PATTERN, true); // repeat=true → loop until cancelled
+}
+export function stopRinging(): void {
+  if (!ringing) return;
+  ringing = false;
+  Vibration.cancel();
+}
+
 // Ask permission and return this device's Expo push token, or null if it can't
 // be obtained (simulator, denied permission, or Expo Go remote-push limits).
 export async function registerForPushToken(): Promise<string | null> {

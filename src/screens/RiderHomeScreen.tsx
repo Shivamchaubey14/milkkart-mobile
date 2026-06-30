@@ -28,7 +28,7 @@ import { UpiQrModal } from "../components/UpiQrModal";
 import { useT } from "../i18n/LanguageProvider";
 import type { TKey } from "../i18n/translations";
 import type { RiderHomeStackParamList } from "../navigation/RiderHomeStack";
-import { presentLocalAlert } from "../notifications/push";
+import { presentLocalAlert, startRinging, stopRinging } from "../notifications/push";
 import { colors, fonts, fontsAlt, spacing } from "../theme";
 
 const money = (n: number | string) => "₹" + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -123,6 +123,15 @@ export default function RiderHomeScreen() {
     }
   }, [day, t]);
 
+  // Ring continuously while a freshly-assigned order is still waiting to be
+  // accepted — and stop the moment the rider accepts (status leaves "assigned").
+  const hasIncoming = (day?.deliveries ?? []).some((d) => d.status === "assigned");
+  useEffect(() => {
+    if (hasIncoming) startRinging();
+    else stopRinging();
+    return () => stopRinging();
+  }, [hasIncoming]);
+
   // Local mirror of duty so the toggle animates immediately, then syncs.
   const [onDuty, setOnDuty] = useState(true);
   useEffect(() => {
@@ -158,6 +167,7 @@ export default function RiderHomeScreen() {
     }
     try {
       if (d.status === "assigned") {
+        stopRinging(); // silence the incoming-order ring the instant they accept
         await acceptOrder(d.order_number).unwrap();
         toast(t("toastOrderAccepted"));
       } else {
