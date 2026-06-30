@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { AdminRider, useAdminCreateRiderMutation, useAdminRidersQuery, useAdminUpdateRiderMutation } from "../../api/baseApi";
 import { Screen } from "../../components/Screen";
@@ -117,41 +117,41 @@ function RiderSheet({ rider, onClose }: { rider: AdminRider | null; onClose: () 
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView style={sheet.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <Pressable style={sheet.backdrop} onPress={onClose} />
-        <View style={sheet.sheet}>
+      <Pressable style={sheet.backdrop} onPress={onClose} />
+      <View style={[sheet.sheet, { maxHeight: "90%" }]}>
         <View style={sheet.handle} />
         <Text style={sheet.title}>{rider ? "Edit rider" : "Onboard a rider"}</Text>
-        <Text style={sheet.label}>Mobile number{rider ? "" : " *"}</Text>
-        <TextInput
-          style={[sheet.input, rider && sheet.inputDisabled]}
-          value={phone}
-          onChangeText={setPhone}
-          editable={!rider}
-          keyboardType="phone-pad"
-          placeholder="+91…"
-          placeholderTextColor={colors.muted}
-        />
-        <Text style={sheet.label}>Name</Text>
-        <TextInput style={sheet.input} value={name} onChangeText={setName} placeholder="Full name" placeholderTextColor={colors.muted} />
-        <Text style={sheet.label}>Vehicle number</Text>
-        <TextInput style={sheet.input} value={vehicle} onChangeText={setVehicle} autoCapitalize="characters" placeholder="UP32 AB 1234" placeholderTextColor={colors.muted} />
-        <Text style={sheet.label}>Email</Text>
-        <TextInput style={sheet.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={colors.muted} />
-        {rider ? (
-          <View style={sheet.switchRow}>
-            <Text style={sheet.switchLabel}>Active</Text>
-            <Switch value={active} onValueChange={setActive} trackColor={{ true: colors.green }} thumbColor={colors.white} />
-          </View>
-        ) : null}
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={sheet.label}>Mobile number{rider ? "" : " *"}</Text>
+          <TextInput
+            style={[sheet.input, rider && sheet.inputDisabled]}
+            value={phone}
+            onChangeText={setPhone}
+            editable={!rider}
+            keyboardType="phone-pad"
+            placeholder="+91…"
+            placeholderTextColor={colors.muted}
+          />
+          <Text style={sheet.label}>Name</Text>
+          <TextInput style={sheet.input} value={name} onChangeText={setName} placeholder="Full name" placeholderTextColor={colors.muted} />
+          <Text style={sheet.label}>Vehicle number</Text>
+          <TextInput style={sheet.input} value={vehicle} onChangeText={setVehicle} autoCapitalize="characters" placeholder="UP32 AB 1234" placeholderTextColor={colors.muted} />
+          <Text style={sheet.label}>Email</Text>
+          <TextInput style={sheet.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={colors.muted} />
+          {rider ? (
+            <View style={sheet.switchRow}>
+              <Text style={sheet.switchLabel}>Active</Text>
+              <Switch value={active} onValueChange={setActive} trackColor={{ true: colors.green }} thumbColor={colors.white} />
+            </View>
+          ) : null}
+        </ScrollView>
         <View style={sheet.actions}>
           <Pressable style={[sheet.btn, sheet.btnGhost]} onPress={onClose}><Text style={sheet.btnGhostText}>Cancel</Text></Pressable>
           <Pressable style={[sheet.btn, sheet.btnPrimary, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}>
             <Text style={sheet.btnPrimaryText}>{saving ? "Saving…" : rider ? "Save changes" : "Add rider"}</Text>
           </Pressable>
         </View>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -195,7 +195,6 @@ const styles = StyleSheet.create({
 });
 
 const sheet = StyleSheet.create({
-  flex: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: spacing(2.5), paddingTop: spacing(1.25), paddingBottom: spacing(3) },
   handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(1.5) },
