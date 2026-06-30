@@ -47,8 +47,12 @@ export default function HomeScreen() {
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners, refetch: refetchBanners } = useBannersQuery();
   const { data: categories, refetch: refetchCategories } = useCategoriesQuery();
+  // Poll the window so an admin opening/closing it (from another device) — and
+  // the time-based open→close transition — reflect on the home page within
+  // seconds, without the customer pulling to refresh.
   const { data: orderWindow, refetch: refetchWindow } = useOrderWindowQuery(undefined, {
     refetchOnMountOrArgChange: true,
+    pollingInterval: 15000,
   });
 
   // null = "All"; otherwise a category id used to filter the product query.
