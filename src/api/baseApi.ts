@@ -188,6 +188,8 @@ export type OrderDetail = {
   total: string;
   coupon_code: string | null;
   address_snapshot: string;
+  /** Saved-address this order points at — used to pre-select it when editing. */
+  address_id: number | null;
   delivery_type: "instant" | "next_day";
   delivery_date: string | null;
   /** Status driving the progress timeline (next-day auto-advances on its day). */
@@ -942,6 +944,15 @@ export const api = createApi({
     orderDetail: build.query<OrderDetail, string>({
       query: (orderNumber) => `/orders/${orderNumber}/`,
     }),
+    // Re-point an in-progress order at a different saved address.
+    changeOrderAddress: build.mutation<OrderDetail, { order_number: string; address_id: number }>({
+      query: ({ order_number, address_id }) => ({
+        url: `/orders/${order_number}/address/`,
+        method: "POST",
+        body: { address_id },
+      }),
+      invalidatesTags: ["Order"],
+    }),
     invoiceForOrder: build.query<Invoice, string>({
       query: (orderNumber) => `/invoices/${orderNumber}/`,
     }),
@@ -1378,6 +1389,7 @@ export const {
   useCheckoutMutation,
   useOrdersQuery,
   useOrderDetailQuery,
+  useChangeOrderAddressMutation,
   useLazyInvoiceForOrderQuery,
   useInitiatePaymentMutation,
   useWalletQuery,

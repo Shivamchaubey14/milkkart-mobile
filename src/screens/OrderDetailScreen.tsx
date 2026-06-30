@@ -2,9 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { OrderItemDetail, useOrderDetailQuery } from "../api/baseApi";
+import {
+  Address,
+  OrderItemDetail,
+  useAddressesQuery,
+  useChangeOrderAddressMutation,
+  useOrderDetailQuery,
+} from "../api/baseApi";
 import { imageUrl } from "../api/config";
 import { DeliveredCelebration } from "../components/DeliveredCelebration";
 import { useInvoiceDownloader } from "../invoices/useInvoiceDownloader";
@@ -94,6 +100,24 @@ export default function OrderDetailScreen() {
   }, [refetch]);
   const [eta, setEta] = useState("");
 
+  // Change-delivery-address sheet (only while the order is still editable).
+  const [addrSheet, setAddrSheet] = useState(false);
+  const [changeAddress, { isLoading: changingAddress }] = useChangeOrderAddressMutation();
+  const pickAddress = useCallback(
+    async (addressId: number) => {
+      if (!order) return;
+      try {
+        await changeAddress({ order_number: order.order_number, address_id: addressId }).unwrap();
+        toast("Delivery address updated.");
+        setAddrSheet(false);
+        refetch();
+      } catch (e: any) {
+        toast(e?.data?.error || "Couldn't change the address.", "error");
+      }
+    },
+    [order, changeAddress, toast, refetch],
+  );
+
   if (isLoading || !order) {
     return (
       <Screen padded={false}>
@@ -103,6 +127,8 @@ export default function OrderDetailScreen() {
   }
 
   const s = statusOf(order.status);
+  // The delivery address can still be changed before anyone is out delivering.
+  const canEditAddress = order.status === "pending" || order.status === "confirmed";
   const returned = order.status === "returned";
   // Returned orders show "Returned" as the final step (only then); otherwise the
   // normal 4-step path. The returned step sits at index 3 and is the active one.
@@ -338,14 +364,26 @@ export default function OrderDetailScreen() {
             </Text>
           </View>
 
-          {/* Address */}
-          <Text style={styles.secLabel}>DELIVERY ADDRESS</Text>
-          <View style={styles.addrCard}>
+          {/* Address — changeable while the order is still pending/confirmed. */}
+          <View style={styles.secHeadRow}>
+            <Text style={styles.secLabelInline}>DELIVERY ADDRESS</Text>
+            {canEditAddress ? (
+              <Pressable style={styles.editLink} onPress={() => setAddrSheet(true)} hitSlop={8}>
+                <Ionicons name="create-outline" size={14} color={colors.green} />
+                <Text style={styles.editLinkText}>Change</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable
+            style={({ pressed }) => [styles.addrCard, pressed && canEditAddress && { opacity: 0.85 }]}
+            onPress={canEditAddress ? () => setAddrSheet(true) : undefined}
+          >
             <View style={styles.addrIcon}>
               <Ionicons name="home-outline" size={16} color={colors.green} />
             </View>
             <Text style={styles.addrText}>{order.address_snapshot}</Text>
-          </View>
+            {canEditAddress ? <Ionicons name="chevron-forward" size={16} color={colors.muted} /> : null}
+          </Pressable>
 
           {/* Bill */}
           <Text style={styles.secLabel}>BILL DETAILS</Text>
@@ -398,7 +436,107 @@ export default function OrderDetailScreen() {
           ) : null}
         </View>
       </ScrollView>
+
+      {addrSheet ? (
+        <AddressSheet
+          currentId={order.address_id}
+          onPick={pickAddress}
+          onClose={() => setAddrSheet(false)}
+          saving={changingAddress}
+          onAddNew={() => {
+            setAddrSheet(false);
+            navigation.navigate("AddAddress");
+          }}
+        />
+      ) : null}
     </Screen>
+  );
+}
+
+// Pick a different saved address (Home / Work / …) for an in-progress order.
+function AddressSheet({
+  currentId,
+  onPick,
+  onClose,
+  saving,
+  onAddNew,
+}: {
+  currentId: number | null;
+  onPick: (id: number) => void;
+  onClose: () => void;
+  saving: boolean;
+  onAddNew: () => void;
+}) {
+  const { data: addresses, isLoading } = useAddressesQuery();
+  const iconFor = (label: string) => {
+    const l = (label || "").toLowerCase();
+    if (l.includes("home")) return "home" as const;
+    if (l.includes("work") || l.includes("office")) return "briefcase" as const;
+    return "location" as const;
+  };
+  const fullAddr = (a: Address) =>
+    [a.address_line, a.landmark, a.city, `${a.state} ${a.pincode}`].filter((p) => p && p.trim()).join(", ");
+
+  return (
+    <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View style={sheet.root}>
+        <Pressable style={sheet.backdrop} onPress={onClose} />
+        <View style={[sheet.sheet, { maxHeight: "82%" }]}>
+          <View style={sheet.handle} />
+          <Text style={sheet.title}>Change delivery address</Text>
+          <Text style={sheet.sub}>Pick one of your saved addresses</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: spacing(1.5) }}>
+            {isLoading ? (
+              <ActivityIndicator color={colors.green} style={{ marginVertical: spacing(3) }} />
+            ) : (addresses ?? []).length === 0 ? (
+              <Text style={sheet.empty}>No saved addresses yet.</Text>
+            ) : (
+              (addresses ?? []).map((a) => {
+                const selected = a.id === currentId;
+                return (
+                  <Pressable
+                    key={a.id}
+                    style={[sheet.addr, selected && sheet.addrSelected]}
+                    onPress={() => onPick(a.id)}
+                    disabled={saving}
+                  >
+                    <View style={[sheet.addrIcon, selected && sheet.addrIconSelected]}>
+                      <Ionicons name={iconFor(a.label)} size={16} color={selected ? colors.white : colors.green} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={sheet.addrTop}>
+                        <Text style={sheet.addrLabel} numberOfLines={1}>{a.label || "Address"}</Text>
+                        {a.is_default ? (
+                          <View style={sheet.defBadge}><Text style={sheet.defText}>DEFAULT</Text></View>
+                        ) : null}
+                      </View>
+                      <Text style={sheet.addrLine} numberOfLines={2}>{fullAddr(a)}</Text>
+                    </View>
+                    {selected ? (
+                      <Ionicons name="checkmark-circle" size={22} color={colors.green} />
+                    ) : (
+                      <View style={sheet.radio} />
+                    )}
+                  </Pressable>
+                );
+              })
+            )}
+          </ScrollView>
+
+          <Pressable style={sheet.addNew} onPress={onAddNew} disabled={saving}>
+            <Ionicons name="add" size={18} color={colors.green} />
+            <Text style={sheet.addNewText}>Add a new address</Text>
+          </Pressable>
+          {saving ? (
+            <View style={sheet.savingRow}>
+              <ActivityIndicator size="small" color={colors.green} />
+              <Text style={sheet.savingText}>Updating…</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -558,6 +696,10 @@ const styles = StyleSheet.create({
   celebrateWrap: { marginBottom: spacing(2) },
 
   secLabel: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 1, color: colors.muted, marginTop: spacing(3), marginBottom: spacing(1) },
+  secHeadRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(3), marginBottom: spacing(1) },
+  secLabelInline: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 1, color: colors.muted },
+  editLink: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.greenTint, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
+  editLinkText: { fontFamily: fonts.bold, fontSize: 12, color: colors.green },
 
   itemCard: {
     flexDirection: "row",
@@ -597,4 +739,54 @@ const styles = StyleSheet.create({
   trackText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
   helpBtn: { width: 110, height: 52, borderRadius: 14, backgroundColor: colors.bgSoft, alignItems: "center", justifyContent: "center" },
   helpText: { fontFamily: fonts.bold, fontSize: 16, color: colors.heading },
+});
+
+const sheet = StyleSheet.create({
+  root: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
+  sheet: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderTopWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: spacing(2.5),
+    paddingTop: spacing(1.25),
+    paddingBottom: spacing(3),
+    shadowColor: "#1c2b36",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 16,
+  },
+  handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(1.5) },
+  title: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading },
+  sub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, marginTop: 2 },
+  empty: { fontFamily: fontsAlt.regular, fontSize: 14, color: colors.muted, textAlign: "center", marginVertical: spacing(3) },
+
+  addr: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing(1.25),
+    backgroundColor: colors.bg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    padding: spacing(1.5),
+    marginBottom: spacing(1.25),
+  },
+  addrSelected: { borderColor: colors.green, backgroundColor: colors.greenTint },
+  addrIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
+  addrIconSelected: { backgroundColor: colors.green },
+  addrTop: { flexDirection: "row", alignItems: "center", gap: spacing(1) },
+  addrLabel: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
+  defBadge: { backgroundColor: "#e8f2fc", borderRadius: 6, paddingVertical: 1.5, paddingHorizontal: 6 },
+  defText: { fontFamily: fontsAlt.extrabold, fontSize: 8, letterSpacing: 0.5, color: colors.info },
+  addrLine: { fontFamily: fontsAlt.regular, fontSize: 12.5, color: colors.muted, marginTop: 3, lineHeight: 17 },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.line },
+
+  addNew: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.green, borderStyle: "dashed", marginTop: spacing(0.5) },
+  addNewText: { fontFamily: fonts.bold, fontSize: 14, color: colors.green },
+  savingRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: spacing(1.5) },
+  savingText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.green },
 });
