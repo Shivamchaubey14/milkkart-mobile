@@ -113,7 +113,7 @@ export default function AdminCatalogScreen() {
                 <Pressable key={p.id} style={styles.row} onPress={() => navigation.navigate("AdminProductEdit", { productId: p.id })}>
                   <View style={styles.thumb}>
                     {img ? (
-                      <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="cover" />
+                      <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="contain" />
                     ) : (
                       <Ionicons name="image-outline" size={20} color={colors.muted} />
                     )}
@@ -233,8 +233,8 @@ const styles = StyleSheet.create({
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
   row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  thumb: { width: 48, height: 48, borderRadius: 12, overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: colors.bgSoft, borderWidth: 1, borderColor: colors.lineSoft },
-  thumbImg: { width: "100%", height: "100%" },
+  thumb: { width: 48, height: 48, borderRadius: 12, overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: colors.bgSoft, borderWidth: 1, borderColor: colors.lineSoft, padding: 4 },
+  thumbImg: { width: "100%", height: "100%", borderRadius: 8 },
   rowName: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
   rowMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2, lineHeight: 17 },
   offPill: { backgroundColor: colors.errorTint, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 6 },

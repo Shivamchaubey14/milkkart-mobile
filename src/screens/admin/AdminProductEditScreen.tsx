@@ -128,7 +128,7 @@ export default function AdminProductEditScreen() {
           <View style={styles.imageRow}>
             <View style={styles.preview}>
               {resolveImageUrl(imageUrl) ? (
-                <Image source={{ uri: resolveImageUrl(imageUrl)! }} style={styles.previewImg} resizeMode="cover" />
+                <Image source={{ uri: resolveImageUrl(imageUrl)! }} style={styles.previewImg} resizeMode="contain" />
               ) : (
                 <Ionicons name="image-outline" size={24} color={colors.muted} />
               )}
@@ -306,8 +306,8 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(5) },
   field: { marginBottom: spacing(1.75) },
   imageRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing(1.5) },
-  preview: { width: 64, height: 64, borderRadius: 14, backgroundColor: colors.bgSoft, borderWidth: 1, borderColor: colors.lineSoft, alignItems: "center", justifyContent: "center", overflow: "hidden", marginTop: spacing(2.5) },
-  previewImg: { width: "100%", height: "100%" },
+  preview: { width: 64, height: 64, borderRadius: 14, backgroundColor: colors.bgSoft, borderWidth: 1, borderColor: colors.lineSoft, alignItems: "center", justifyContent: "center", overflow: "hidden", marginTop: spacing(2.5), padding: 5 },
+  previewImg: { width: "100%", height: "100%", borderRadius: 9 },
   fieldLabel: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 0.8, color: colors.muted, marginBottom: spacing(0.75) },
   input: { backgroundColor: colors.bgSoft, borderRadius: 12, borderWidth: 1, borderColor: colors.line, paddingHorizontal: spacing(1.75), paddingVertical: spacing(1.5), fontFamily: fonts.medium, fontSize: 15, color: colors.heading },
 
