@@ -88,7 +88,7 @@ export default function AdminSettingsScreen() {
       {isLoading || !data ? (
         <ActivityIndicator color={colors.green} style={{ marginTop: spacing(5) }} />
       ) : (
-        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           {/* Store fees */}
           <Text style={styles.section}>STORE FEES</Text>
           <View style={styles.card}>
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
 
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(5) },
   section: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 0.8, color: colors.muted, marginTop: spacing(2.5), marginBottom: spacing(1) },
-  card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, paddingHorizontal: spacing(1.75) },
+  card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, paddingHorizontal: spacing(1.75), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   hint: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: spacing(1), lineHeight: 18 },
 
   fieldRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing(1.5) },
