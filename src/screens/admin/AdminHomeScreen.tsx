@@ -43,6 +43,7 @@ export default function AdminHomeScreen() {
     else if (s.key === "settings") navigation.navigate("AdminSettings");
     else if (s.key === "subscriptions") navigation.navigate("AdminSubscriptions");
     else if (s.key === "serviceability") navigation.navigate("AdminServiceability");
+    else if (s.key === "import") navigation.navigate("AdminBulkImport");
     else navigation.navigate("AdminSection", { key: s.key, title: s.title });
   };
 

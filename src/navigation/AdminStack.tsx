@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import AdminBulkImportScreen from "../screens/admin/AdminBulkImportScreen";
 import AdminCatalogScreen from "../screens/admin/AdminCatalogScreen";
 import AdminDashboardScreen from "../screens/admin/AdminDashboardScreen";
 import AdminHomeScreen from "../screens/admin/AdminHomeScreen";
@@ -25,6 +26,7 @@ export type AdminStackParamList = {
   AdminSettings: undefined;
   AdminSubscriptions: undefined;
   AdminServiceability: undefined;
+  AdminBulkImport: undefined;
   AdminSection: { key: string; title: string };
 };
 
@@ -46,6 +48,7 @@ export default function AdminStack() {
       <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionsScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AdminServiceability" component={AdminServiceabilityScreen} options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="AdminBulkImport" component={AdminBulkImportScreen} options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="AdminSection" component={AdminPlaceholderScreen} options={{ animation: "slide_from_right" }} />
     </Stack.Navigator>
   );
