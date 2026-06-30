@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   uploadBtn: { backgroundColor: colors.green, borderRadius: 14, height: 52, alignItems: "center", justifyContent: "center", marginTop: spacing(1.5) },
   uploadText: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
 
-  jobCard: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginTop: spacing(2) },
+  jobCard: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginTop: spacing(2), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   jobTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   jobName: { flex: 1, fontFamily: fonts.bold, fontSize: 14, color: colors.heading, marginRight: spacing(1) },
   barTrack: { height: 8, borderRadius: 5, backgroundColor: colors.bgSoft, overflow: "hidden", marginTop: spacing(1.25) },
