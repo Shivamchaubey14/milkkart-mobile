@@ -178,10 +178,10 @@ export default function AdminDashboardScreen() {
         >
           {/* KPI cards */}
           <View style={styles.kpiGrid}>
-            <Kpi label="Orders" value={String(sales.data?.orders ?? 0)} icon="receipt-outline" />
-            <Kpi label="Revenue" value={money(sales.data?.revenue ?? 0)} icon="cash-outline" />
-            <Kpi label="Avg order" value={money(sales.data?.average_order_value ?? 0)} icon="trending-up-outline" />
-            <Kpi label="Subscriptions" value={`${subs.data?.active ?? 0}/${subs.data?.total ?? 0}`} icon="repeat-outline" />
+            <Kpi label="Orders" value={String(sales.data?.orders ?? 0)} icon="receipt-outline" tint={colors.greenTint} fg={colors.green} />
+            <Kpi label="Revenue" value={money(sales.data?.revenue ?? 0)} icon="cash-outline" tint="#fff4d6" fg="#b98421" />
+            <Kpi label="Avg order" value={money(sales.data?.average_order_value ?? 0)} icon="trending-up-outline" tint="#e8f2fc" fg={colors.info} />
+            <Kpi label="Subscriptions" value={`${subs.data?.active ?? 0}/${subs.data?.total ?? 0}`} icon="repeat-outline" tint="#efe6f7" fg="#7c5cd6" />
           </View>
 
           {/* Orders by status */}
@@ -256,11 +256,27 @@ export default function AdminDashboardScreen() {
   );
 }
 
-function Kpi({ label, value, icon }: { label: string; value: string; icon: React.ComponentProps<typeof Ionicons>["name"] }) {
+function Kpi({
+  label,
+  value,
+  icon,
+  tint,
+  fg,
+}: {
+  label: string;
+  value: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  tint: string;
+  fg: string;
+}) {
   return (
-    <View style={styles.kpi}>
-      <Ionicons name={icon} size={18} color={colors.green} />
-      <Text style={styles.kpiValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+    <View style={[styles.kpi, { backgroundColor: tint }]}>
+      <View style={styles.kpiIcon}>
+        <Ionicons name={icon} size={16} color={fg} />
+      </View>
+      <Text style={[styles.kpiValue, { color: fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {value}
+      </Text>
       <Text style={styles.kpiLabel}>{label}</Text>
     </View>
   );
@@ -298,9 +314,10 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(5) },
 
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  kpi: { width: "48.5%", backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.5), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  kpiValue: { fontFamily: fonts.bold, fontSize: 20, color: colors.heading, marginTop: spacing(1) },
-  kpiLabel: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
+  kpi: { width: "48.5%", borderRadius: 16, padding: spacing(1.75), marginBottom: spacing(1.5), shadowColor: "#1c2b36", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  kpiIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", marginBottom: spacing(1.25) },
+  kpiValue: { alignSelf: "stretch", fontFamily: fonts.bold, fontSize: 20 },
+  kpiLabel: { fontFamily: fonts.semibold, fontSize: 12, color: colors.heading, marginTop: 3 },
 
   sectionTitle: { fontFamily: fonts.bold, fontSize: 17, color: colors.heading, marginTop: spacing(2), marginBottom: spacing(1.25) },
   card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75) },
