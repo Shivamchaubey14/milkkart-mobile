@@ -65,7 +65,7 @@ export default function AdminHomeScreen() {
               </Text>
             </View>
             <Pressable style={styles.logoutBtn} onPress={onLogout} hitSlop={8}>
-              <Ionicons name="log-out-outline" size={16} color={colors.heading} />
+              <Ionicons name="log-out-outline" size={16} color={colors.error} />
               <Text style={styles.logoutText}>Logout</Text>
             </Pressable>
           </View>
@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing(1.5) },
   headerTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.white },
   headerSub: { fontFamily: fontsAlt.regular, fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 3 },
-  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.white, borderRadius: 10, paddingVertical: spacing(0.85), paddingHorizontal: spacing(1.25) },
-  logoutText: { fontFamily: fonts.bold, fontSize: 13, color: colors.heading },
+  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.errorTint, borderRadius: 10, paddingVertical: spacing(0.85), paddingHorizontal: spacing(1.25) },
+  logoutText: { fontFamily: fonts.bold, fontSize: 13, color: colors.error },
 
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", paddingHorizontal: spacing(2.5), paddingTop: spacing(2.5) },
   card: {
