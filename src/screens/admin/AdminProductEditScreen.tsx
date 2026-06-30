@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -25,6 +26,7 @@ import {
   useAdminUpdateProductMutation,
   useAdminUpdateVariantMutation,
 } from "../../api/baseApi";
+import { imageUrl as resolveImageUrl } from "../../api/config";
 import { Screen } from "../../components/Screen";
 import { useToast } from "../../components/Toast";
 import type { AdminStackParamList } from "../../navigation/AdminStack";
@@ -122,9 +124,21 @@ export default function AdminProductEditScreen() {
         <ActivityIndicator color={colors.green} style={{ marginTop: spacing(4) }} />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
+          {/* Image preview + URL */}
+          <View style={styles.imageRow}>
+            <View style={styles.preview}>
+              {resolveImageUrl(imageUrl) ? (
+                <Image source={{ uri: resolveImageUrl(imageUrl)! }} style={styles.previewImg} resizeMode="cover" />
+              ) : (
+                <Ionicons name="image-outline" size={24} color={colors.muted} />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field label="Image URL" value={imageUrl} onChangeText={setImageUrl} placeholder="images/products/…" autoCapitalize="none" />
+            </View>
+          </View>
           <Field label="Name" value={name} onChangeText={setName} placeholder="Amul Gold Milk" />
           <Field label="Brand" value={brand} onChangeText={setBrand} placeholder="Amul" />
-          <Field label="Image URL" value={imageUrl} onChangeText={setImageUrl} placeholder="https://…" autoCapitalize="none" />
           <Field label="Tags" value={tags} onChangeText={setTags} placeholder="milk, dairy" autoCapitalize="none" />
           <Field label="Description" value={description} onChangeText={setDescription} placeholder="Short description" multiline />
 
@@ -291,6 +305,9 @@ const styles = StyleSheet.create({
 
   body: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(5) },
   field: { marginBottom: spacing(1.75) },
+  imageRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing(1.5) },
+  preview: { width: 64, height: 64, borderRadius: 14, backgroundColor: colors.bgSoft, borderWidth: 1, borderColor: colors.lineSoft, alignItems: "center", justifyContent: "center", overflow: "hidden", marginTop: spacing(2.5) },
+  previewImg: { width: "100%", height: "100%" },
   fieldLabel: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 0.8, color: colors.muted, marginBottom: spacing(0.75) },
   input: { backgroundColor: colors.bgSoft, borderRadius: 12, borderWidth: 1, borderColor: colors.line, paddingHorizontal: spacing(1.75), paddingVertical: spacing(1.5), fontFamily: fonts.medium, fontSize: 15, color: colors.heading },
 

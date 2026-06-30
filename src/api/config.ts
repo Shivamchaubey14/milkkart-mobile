@@ -43,16 +43,26 @@ function devApiBase(): string | null {
 
 export const API_BASE = devApiBase() ?? `${PROD_API_ORIGIN}/api/v1`;
 
-// Product images are uploaded to and served by the BACKEND (under /media/). The
-// API returns either an absolute URL (passed through by imageUrl) or a relative
-// /media/... path, which resolves against the backend origin below. So IMAGE_BASE
-// is simply the API origin without the /api/v1 suffix.
+// Backend origin (without /api/v1) — serves uploaded media under /media/.
 export const IMAGE_BASE = API_BASE.replace(/\/api\/v1\/?$/, "");
 
+// The catalog's seeded product images (`images/products/…`) are served by the
+// storefront WEB server on :3000, not the backend. In dev that's the same host
+// the phone reached the packager through; standalone falls back to the backend
+// origin (best effort — the web isn't tunnelled there).
+function devWebBase(): string | null {
+  const host = expoHostUri()?.split("://").pop()?.split(":")[0]?.trim();
+  return host && host.length > 0 ? `http://${host}:3000` : null;
+}
+export const WEB_BASE = devWebBase() ?? PROD_API_ORIGIN;
+
 // Resolve a catalog image_url to a full URL the <Image> can load. Returns null
-// for empty paths; passes through absolute http(s)/data URLs unchanged.
+// for empty paths; passes absolute http(s)/data URLs through unchanged. Backend
+// uploads live under /media/; everything else is a web-hosted catalog image.
 export function imageUrl(path?: string | null): string | null {
   if (!path) return null;
   if (/^(https?:|data:)/.test(path)) return path;
-  return `${IMAGE_BASE}/${path.replace(/^\//, "")}`;
+  const clean = path.replace(/^\//, "");
+  const base = clean.startsWith("media/") ? IMAGE_BASE : WEB_BASE;
+  return `${base}/${clean}`;
 }
