@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { AdminRider, useAdminCreateRiderMutation, useAdminRidersQuery, useAdminUpdateRiderMutation } from "../../api/baseApi";
 import { Screen } from "../../components/Screen";
@@ -117,8 +117,9 @@ function RiderSheet({ rider, onClose }: { rider: AdminRider | null; onClose: () 
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={sheet.backdrop} onPress={onClose} />
-      <View style={sheet.sheet}>
+      <KeyboardAvoidingView style={sheet.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <Pressable style={sheet.backdrop} onPress={onClose} />
+        <View style={sheet.sheet}>
         <View style={sheet.handle} />
         <Text style={sheet.title}>{rider ? "Edit rider" : "Onboard a rider"}</Text>
         <Text style={sheet.label}>Mobile number{rider ? "" : " *"}</Text>
@@ -149,7 +150,8 @@ function RiderSheet({ rider, onClose }: { rider: AdminRider | null; onClose: () 
             <Text style={sheet.btnPrimaryText}>{saving ? "Saving…" : rider ? "Save changes" : "Add rider"}</Text>
           </Pressable>
         </View>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -193,6 +195,7 @@ const styles = StyleSheet.create({
 });
 
 const sheet = StyleSheet.create({
+  flex: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
   sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: spacing(2.5), paddingTop: spacing(1.25), paddingBottom: spacing(3) },
   handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(1.5) },
