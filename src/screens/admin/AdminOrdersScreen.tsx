@@ -113,7 +113,7 @@ export default function AdminOrdersScreen() {
     ]);
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={styles.screen}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -397,6 +397,7 @@ function BillRow({ label, value, strong, green }: { label: string; value: string
 }
 
 const styles = StyleSheet.create({
+  screen: { backgroundColor: colors.bgSoft },
   header: {
     backgroundColor: colors.heading,
     borderRadius: 26,
@@ -441,7 +442,19 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.white },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  card: { backgroundColor: colors.bg, borderRadius: 18, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.5) },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.lineSoft,
+    padding: spacing(1.75),
+    marginBottom: spacing(1.5),
+    shadowColor: "#1c2b36",
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
   cardTop: { flexDirection: "row", alignItems: "center", gap: spacing(1.25) },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.greenTint, alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: fonts.bold, fontSize: 16, color: colors.green },
