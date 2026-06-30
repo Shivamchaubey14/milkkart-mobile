@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import {
   DeliveryZone,
@@ -173,11 +173,13 @@ function AreaSheet({ area, onClose }: { area: ServiceableArea | null; onClose: (
 
   return (
     <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={sheet.backdrop} onPress={onClose} />
-      <View style={[sheet.sheet, { maxHeight: "90%" }]}>
-        <View style={sheet.handle} />
-        <Text style={sheet.title}>{area ? "Edit area" : "New area"}</Text>
-        <ScrollView showsVerticalScrollIndicator={false}>
+      <View style={sheet.root}>
+        <Pressable style={sheet.backdrop} onPress={onClose} />
+        <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={Platform.OS === "android" ? -spacing(2) : 0}>
+          <View style={[sheet.sheet, { maxHeight: "90%" }]}>
+            <View style={sheet.handle} />
+            <Text style={sheet.title}>{area ? "Edit area" : "New area"}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <Lbl t="Pincode *" />
           <TextInput style={sheet.input} value={pincode} onChangeText={setPincode} keyboardType="number-pad" placeholder="224001" placeholderTextColor={colors.muted} />
           <Lbl t="Area name" />
@@ -192,12 +194,14 @@ function AreaSheet({ area, onClose }: { area: ServiceableArea | null; onClose: (
             <View style={{ flex: 1 }}><TextInput style={sheet.input} value={lng} onChangeText={setLng} keyboardType="numbers-and-punctuation" placeholder="Lng" placeholderTextColor={colors.muted} /></View>
             <View style={{ flex: 1 }}><TextInput style={sheet.input} value={radius} onChangeText={setRadius} keyboardType="decimal-pad" placeholder="Km" placeholderTextColor={colors.muted} /></View>
           </View>
-          <View style={sheet.switchRow}><Text style={sheet.switchLabel}>Active</Text><Switch value={active} onValueChange={setActive} trackColor={{ true: colors.green }} thumbColor={colors.white} /></View>
-        </ScrollView>
-        <View style={sheet.actions}>
-          <Pressable style={[sheet.btn, sheet.btnGhost]} onPress={onClose}><Text style={sheet.btnGhostText}>Cancel</Text></Pressable>
-          <Pressable style={[sheet.btn, sheet.btnPrimary, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}><Text style={sheet.btnPrimaryText}>{saving ? "Saving…" : "Save"}</Text></Pressable>
-        </View>
+              <View style={sheet.switchRow}><Text style={sheet.switchLabel}>Active</Text><Switch value={active} onValueChange={setActive} trackColor={{ true: colors.green }} thumbColor={colors.white} /></View>
+            </ScrollView>
+            <View style={sheet.actions}>
+              <Pressable style={[sheet.btn, sheet.btnGhost]} onPress={onClose}><Text style={sheet.btnGhostText}>Cancel</Text></Pressable>
+              <Pressable style={[sheet.btn, sheet.btnPrimary, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}><Text style={sheet.btnPrimaryText}>{saving ? "Saving…" : "Save"}</Text></Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -235,8 +239,9 @@ const styles = StyleSheet.create({
 });
 
 const sheet = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: spacing(2.5), paddingTop: spacing(1.25), paddingBottom: spacing(3) },
+  root: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, borderTopWidth: 1, borderColor: colors.line, paddingHorizontal: spacing(2.5), paddingTop: spacing(1.25), paddingBottom: spacing(3), shadowColor: "#1c2b36", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: -4 }, elevation: 16 },
   handle: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, marginBottom: spacing(1.5) },
   title: { fontFamily: fonts.bold, fontSize: 18, color: colors.heading, marginBottom: spacing(0.5) },
   label: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 0.8, color: colors.muted, marginTop: spacing(1.5), marginBottom: spacing(0.75) },
