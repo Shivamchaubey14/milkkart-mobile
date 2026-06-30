@@ -74,7 +74,10 @@ export default function RiderDeliveriesScreen() {
   const { kind } = useRoute<RouteProp<RiderHomeStackParamList, "RiderDeliveries">>().params;
   const navigation = useNavigation<NativeStackNavigationProp<RiderHomeStackParamList>>();
   const t = useT();
-  const { data, isLoading, isFetching, refetch } = useRiderDeliveriesQuery(kind);
+  // Poll so status changes / new assignments surface within ~20s without a pull.
+  const { data, isLoading, isFetching, refetch } = useRiderDeliveriesQuery(kind, {
+    pollingInterval: 20000,
+  });
   const [openFor, setOpenFor] = useState<RiderDelivery | null>(null);
 
   // Group the flat (already newest-first) list into date sections.

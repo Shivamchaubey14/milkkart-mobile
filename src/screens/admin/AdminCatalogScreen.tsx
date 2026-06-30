@@ -35,7 +35,6 @@ import type { AdminStackParamList } from "../../navigation/AdminStack";
 import { colors, fonts, fontsAlt, spacing } from "../../theme";
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
-const TINTS = ["#fde2e4", "#e2ecf9", "#e6f5ec", "#f6efdf", "#efe6f7", "#e2f3f5"];
 
 export default function AdminCatalogScreen() {
   const navigation = useNavigation<Nav>();
@@ -72,7 +71,7 @@ export default function AdminCatalogScreen() {
     ]);
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <View style={styles.header}>
         <View style={styles.blob} />
         <View style={styles.headerRow}>
@@ -108,16 +107,20 @@ export default function AdminCatalogScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={pFetching} onRefresh={refetchP} tintColor={colors.green} colors={[colors.green]} />}
           >
-            {(products ?? []).map((p, i) => {
+            {(products ?? []).map((p) => {
               const img = imageUrl(p.image_url);
               return (
                 <Pressable key={p.id} style={styles.row} onPress={() => navigation.navigate("AdminProductEdit", { productId: p.id })}>
-                  <View style={[styles.thumb, { backgroundColor: TINTS[i % TINTS.length] }]}>
-                    {img ? <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="contain" /> : null}
+                  <View style={styles.thumb}>
+                    {img ? (
+                      <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="contain" />
+                    ) : (
+                      <Ionicons name="image-outline" size={20} color={colors.muted} />
+                    )}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowName} numberOfLines={1}>{p.name}</Text>
-                    <Text style={styles.rowMeta} numberOfLines={1}>
+                    <Text style={styles.rowName}>{p.name}</Text>
+                    <Text style={styles.rowMeta}>
                       {p.category_name} · {p.variant_count} {p.variant_count === 1 ? "variant" : "variants"} · {p.total_stock} in stock
                     </Text>
                   </View>
@@ -229,11 +232,11 @@ const styles = StyleSheet.create({
   segTextActive: { color: colors.heading },
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25) },
-  thumb: { width: 46, height: 46, borderRadius: 10, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  thumbImg: { width: "100%", height: "100%" },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing(1.25), backgroundColor: colors.bg, borderRadius: 14, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.5), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  thumb: { width: 48, height: 48, borderRadius: 12, overflow: "hidden", alignItems: "center", justifyContent: "center", backgroundColor: colors.bgSoft, borderWidth: 1, borderColor: colors.lineSoft, padding: 4 },
+  thumbImg: { width: "100%", height: "100%", borderRadius: 8 },
   rowName: { fontFamily: fonts.bold, fontSize: 14, color: colors.heading },
-  rowMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
+  rowMeta: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2, lineHeight: 17 },
   offPill: { backgroundColor: colors.errorTint, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 6 },
   offPillText: { fontFamily: fonts.bold, fontSize: 9, color: colors.error },
   del: { padding: 4 },

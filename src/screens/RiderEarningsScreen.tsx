@@ -49,7 +49,10 @@ export default function RiderEarningsScreen() {
   const t = useT();
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const { data, isLoading, isFetching, refetch } = useRiderEarningsQuery(dateISO(date));
+  // Poll so completed deliveries bump the earnings totals without a manual pull.
+  const { data, isLoading, isFetching, refetch } = useRiderEarningsQuery(dateISO(date), {
+    pollingInterval: 30000,
+  });
 
   const daily = data?.daily ?? [];
   const maxEarn = Math.max(1, ...daily.map((d) => Number(d.earnings)));

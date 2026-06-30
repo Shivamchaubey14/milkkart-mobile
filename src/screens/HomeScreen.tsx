@@ -41,15 +41,39 @@ function fmtClock(t: string) {
   return mm && mm !== "00" ? `${h}:${mm} ${ap}` : `${h} ${ap}`;
 }
 
+// Minutes left until the window closes today → "2h 14m" / "47m" / null if past.
+function closesIn(end: string) {
+  const [hh, mm] = end.split(":").map(Number);
+  const close = new Date();
+  close.setHours(hh || 0, mm || 0, 0, 0);
+  const diff = Math.floor((close.getTime() - Date.now()) / 60000);
+  if (diff <= 0) return null;
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user = useAppSelector((s) => s.auth.user);
   const initial = (user?.name?.trim()?.[0] || "A").toUpperCase();
   const { data: banners, refetch: refetchBanners } = useBannersQuery();
   const { data: categories, refetch: refetchCategories } = useCategoriesQuery();
+  // Poll the window so an admin opening/closing it (from another device) — and
+  // the time-based open→close transition — reflect on the home page within
+  // seconds, without the customer pulling to refresh.
   const { data: orderWindow, refetch: refetchWindow } = useOrderWindowQuery(undefined, {
     refetchOnMountOrArgChange: true,
+    pollingInterval: 15000,
   });
+  // Re-render every 30s so the "closes in …" countdown stays current between polls.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const windowOpen = !!orderWindow?.enabled && orderWindow.open;
+  const closeCountdown = windowOpen ? closesIn(orderWindow!.end) : null;
 
   // null = "All"; otherwise a category id used to filter the product query.
   const [activeCatId, setActiveCatId] = useState<number | null>(null);
@@ -163,12 +187,24 @@ export default function HomeScreen() {
 
         <View style={styles.content}>
           {/* Next-day pre-order window — nudges customers to order before it closes. */}
-          {orderWindow?.enabled && orderWindow.open ? (
+          {windowOpen ? (
             <View style={styles.preorder}>
-              <Ionicons name="sunny-outline" size={18} color="#d64a4a" />
-              <Text style={styles.preorderText}>
-                Pre-order for tomorrow — order before {fmtClock(orderWindow.end)}
-              </Text>
+              <View style={styles.preorderIcon}>
+                <Ionicons name="alarm" size={20} color={colors.white} />
+              </View>
+              <View style={styles.preorderBody}>
+                <View style={styles.preorderTitleRow}>
+                  <Text style={styles.preorderTitle} numberOfLines={1}>Pre-order for tomorrow</Text>
+                  <View style={styles.preorderPill}>
+                    <View style={styles.preorderDot} />
+                    <Text style={styles.preorderPillText}>OPEN</Text>
+                  </View>
+                </View>
+                <Text style={styles.preorderSub} numberOfLines={2}>
+                  Order before {fmtClock(orderWindow!.end)}
+                  {closeCountdown ? ` · closes in ${closeCountdown}` : ""}
+                </Text>
+              </View>
             </View>
           ) : null}
 
@@ -358,16 +394,43 @@ const styles = StyleSheet.create({
   preorder: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing(1),
-    backgroundColor: "#fdeaea",
+    gap: spacing(1.5),
+    backgroundColor: "#eaf7ef",
     borderWidth: 1,
-    borderColor: "#f3b6b6",
-    borderRadius: 12,
-    paddingVertical: spacing(1.25),
-    paddingHorizontal: spacing(1.75),
+    borderColor: "#c2e7d1",
+    borderRadius: 16,
+    paddingVertical: spacing(1.5),
+    paddingHorizontal: spacing(1.5),
     marginBottom: spacing(2),
   },
-  preorderText: { flex: 1, fontFamily: fonts.semibold, fontSize: 12.5, lineHeight: 17, color: "#b23b3b" },
+  preorderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: colors.green,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: colors.green,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  preorderBody: { flex: 1 },
+  preorderTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing(1) },
+  preorderTitle: { flexShrink: 1, fontFamily: fonts.bold, fontSize: 14.5, color: colors.heading },
+  preorderPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.green,
+    borderRadius: 999,
+    paddingVertical: 2.5,
+    paddingHorizontal: 8,
+  },
+  preorderDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.white },
+  preorderPillText: { fontFamily: fontsAlt.extrabold, fontSize: 9, letterSpacing: 0.7, color: colors.white },
+  preorderSub: { fontFamily: fonts.semibold, fontSize: 12.5, lineHeight: 17, color: colors.green, marginTop: 3 },
 
   banner: {
     flexDirection: "row",

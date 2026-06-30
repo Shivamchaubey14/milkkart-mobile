@@ -43,6 +43,7 @@ export default function AdminHomeScreen() {
     else if (s.key === "settings") navigation.navigate("AdminSettings");
     else if (s.key === "subscriptions") navigation.navigate("AdminSubscriptions");
     else if (s.key === "serviceability") navigation.navigate("AdminServiceability");
+    else if (s.key === "import") navigation.navigate("AdminBulkImport");
     else navigation.navigate("AdminSection", { key: s.key, title: s.title });
   };
 
@@ -52,20 +53,20 @@ export default function AdminHomeScreen() {
   };
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} style={{ backgroundColor: colors.bgSoft }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.blob} />
           <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.eyebrow}>BACK OFFICE</Text>
+            <View style={{ flex: 1 }}>
               <Text style={styles.headerTitle}>Admin Console</Text>
               <Text style={styles.headerSub}>
                 {(user?.name?.trim() || "Staff")} · {String(user?.role || "admin").toUpperCase()}
               </Text>
             </View>
             <Pressable style={styles.logoutBtn} onPress={onLogout} hitSlop={8}>
-              <Ionicons name="log-out-outline" size={20} color={colors.white} />
+              <Ionicons name="log-out-outline" size={16} color={colors.error} />
+              <Text style={styles.logoutText}>Logout</Text>
             </Pressable>
           </View>
         </View>
@@ -77,7 +78,7 @@ export default function AdminHomeScreen() {
                 <Ionicons name={s.icon} size={22} color={s.fg} />
               </View>
               <Text style={styles.cardTitle}>{s.title}</Text>
-              <Text style={styles.cardSub} numberOfLines={1}>{s.subtitle}</Text>
+              <Text style={styles.cardSub}>{s.subtitle}</Text>
             </Pressable>
           ))}
         </View>
@@ -99,23 +100,28 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   blob: { position: "absolute", top: -45, right: -30, width: 150, height: 150, borderRadius: 75, backgroundColor: "rgba(255,255,255,0.06)" },
-  headerTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  eyebrow: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 1.5, color: colors.green },
-  headerTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.white, marginTop: 2 },
+  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing(1.5) },
+  headerTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.white },
   headerSub: { fontFamily: fontsAlt.regular, fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 3 },
-  logoutBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
+  logoutBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.errorTint, borderRadius: 10, paddingVertical: spacing(0.85), paddingHorizontal: spacing(1.25) },
+  logoutText: { fontFamily: fonts.bold, fontSize: 13, color: colors.error },
 
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", paddingHorizontal: spacing(2.5), paddingTop: spacing(2.5) },
   card: {
     width: "48.5%",
-    backgroundColor: colors.bg,
+    backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.lineSoft,
     padding: spacing(1.75),
     marginBottom: spacing(2),
+    shadowColor: "#1c2b36",
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   cardIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", marginBottom: spacing(1.25) },
   cardTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
-  cardSub: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
+  cardSub: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2, lineHeight: 16 },
 });

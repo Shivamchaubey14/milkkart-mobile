@@ -500,6 +500,22 @@ export type AdminProduct = {
   created_at: string;
 };
 
+// Bulk import (apps/core)
+export type BulkImport = {
+  id: number;
+  kind: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  filename: string;
+  total_rows: number;
+  processed_rows: number;
+  success_count: number;
+  error_count: number;
+  progress_percent: number;
+  errors: { row: number; message: string }[];
+  message: string;
+  created_at: string;
+};
+
 // Serviceability admin (apps/serviceability)
 export type ServiceableArea = {
   id: number;
@@ -686,7 +702,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner", "AdminSettings", "AdminArea", "AdminZone"],
+  tagTypes: ["Me", "Address", "Rating", "Cart", "Wallet", "Order", "Subscription", "Support", "Notification", "NotifPref", "RiderDuty", "RiderDay", "AdminOrder", "AdminCategory", "AdminProduct", "AdminInventory", "AdminRider", "AdminCoupon", "AdminBanner", "AdminSettings", "AdminArea", "AdminZone", "AdminImport"],
   endpoints: (build) => ({
     sendOtp: build.mutation<{ message: string }, { phone: string }>({
       query: (body) => ({ url: "/auth/otp/send/", method: "POST", body }),
@@ -1102,6 +1118,13 @@ export const api = createApi({
       query: (body) => ({ url: "/admin/riders/", method: "POST", body }),
       invalidatesTags: ["AdminRider"],
     }),
+    adminUpdateRider: build.mutation<
+      AdminRider,
+      { id: number; name?: string; email?: string; address?: string; vehicle_number?: string; is_active?: boolean }
+    >({
+      query: ({ id, ...body }) => ({ url: `/admin/riders/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminRider"],
+    }),
     adminOrderDetail: build.query<AdminOrderDetail, string>({
       query: (orderNumber) => `/admin/orders/${orderNumber}/`,
       providesTags: ["AdminOrder"],
@@ -1294,6 +1317,25 @@ export const api = createApi({
       query: (id) => ({ url: `/serviceability/zones/${id}/`, method: "DELETE" }),
       invalidatesTags: ["AdminZone"],
     }),
+
+    // Bulk import — upload a spreadsheet, then poll the job for progress
+    adminImports: build.query<BulkImport[], void>({
+      query: () => "/admin/imports/",
+      providesTags: ["AdminImport"],
+    }),
+    adminImportDetail: build.query<BulkImport, number>({
+      query: (id) => `/admin/imports/${id}/`,
+    }),
+    adminCreateImport: build.mutation<BulkImport, { kind: string; file: { uri: string; name: string; mimeType?: string } }>({
+      query: ({ kind, file }) => {
+        const form = new FormData();
+        form.append("kind", kind);
+        // React Native FormData file part — uri/name/type triple.
+        form.append("file", { uri: file.uri, name: file.name, type: file.mimeType || "application/octet-stream" } as any);
+        return { url: "/admin/imports/", method: "POST", body: form };
+      },
+      invalidatesTags: ["AdminImport"],
+    }),
   }),
 });
 
@@ -1367,6 +1409,7 @@ export const {
   useAdminCancelOrderMutation,
   useAdminAssignOrderMutation,
   useAdminCreateRiderMutation,
+  useAdminUpdateRiderMutation,
   useAdminOrderDetailQuery,
   useAdminCategoriesQuery,
   useAdminCreateCategoryMutation,
@@ -1408,4 +1451,7 @@ export const {
   useAdminZonesQuery,
   useAdminUpdateZoneMutation,
   useAdminDeleteZoneMutation,
+  useAdminImportsQuery,
+  useAdminImportDetailQuery,
+  useAdminCreateImportMutation,
 } = api;
