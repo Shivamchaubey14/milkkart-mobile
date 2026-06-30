@@ -349,11 +349,16 @@ export default function RiderHomeScreen() {
               <Text style={styles.fullAddress}>{current.address}</Text>
             </View>
             {current.delivery_type === "next_day" ? (
-              <View style={styles.nextDayChip}>
-                <Ionicons name="sunny-outline" size={13} color="#b98421" />
-                <Text style={styles.nextDayChipText}>
-                  Next-day{current.delivery_date ? ` · ${shortDay(current.delivery_date)}` : ""}
-                </Text>
+              <View style={styles.nextDay}>
+                <View style={styles.nextDayIcon}>
+                  <Ionicons name="calendar" size={15} color={colors.white} />
+                </View>
+                <Text style={styles.nextDayLabel} numberOfLines={1}>Next-day delivery</Text>
+                {current.delivery_date ? (
+                  <View style={styles.nextDayDate}>
+                    <Text style={styles.nextDayDateText}>{shortDay(current.delivery_date)}</Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
             {/* COD orders can be paid by UPI — show a QR for the order amount. */}
@@ -632,18 +637,40 @@ const styles = StyleSheet.create({
   collectPrepaid: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2 },
   addressRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: spacing(1.5) },
   fullAddress: { flex: 1, fontFamily: fontsAlt.regular, fontSize: 13, color: colors.text, lineHeight: 19 },
-  nextDayChip: {
+  nextDay: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 4,
-    backgroundColor: "#fff4d6",
-    borderRadius: 8,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    marginTop: spacing(1),
+    gap: spacing(1),
+    backgroundColor: "#fff7e6",
+    borderWidth: 1,
+    borderColor: "#f3dca6",
+    borderRadius: 12,
+    paddingVertical: spacing(0.75),
+    paddingHorizontal: spacing(0.75),
+    marginTop: spacing(1.25),
   },
-  nextDayChipText: { fontFamily: fonts.bold, fontSize: 11, color: "#b98421" },
+  nextDayIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#d9920a",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#d9920a",
+    shadowOpacity: 0.32,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  nextDayLabel: { flex: 1, fontFamily: fonts.bold, fontSize: 13, color: "#8a6216" },
+  nextDayDate: {
+    backgroundColor: "#f6e2b0",
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    marginRight: spacing(0.5),
+  },
+  nextDayDateText: { fontFamily: fontsAlt.extrabold, fontSize: 11, letterSpacing: 0.3, color: "#92610a" },
 
   // Product thumbnail stack (like My Orders)
   thumbs: { flexDirection: "row" },
