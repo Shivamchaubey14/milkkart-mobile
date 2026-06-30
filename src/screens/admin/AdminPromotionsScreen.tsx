@@ -22,7 +22,14 @@ import { useToast } from "../../components/Toast";
 import { colors, fonts, fontsAlt, spacing } from "../../theme";
 
 const dayLabel = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-const discountText = (c: AdminCoupon) => (c.discount_type === "percent" ? `${Number(c.value)}% off` : `₹${Number(c.value)} off`);
+const discountText = (c: AdminCoupon) => (c.discount_type === "percent" ? `${Number(c.value)}% OFF` : `₹${Number(c.value)} OFF`);
+// A banner's bg_color may be a hex or a CSS gradient string — pull a usable color.
+const swatchColor = (bg: string): string => {
+  if (!bg) return colors.green;
+  if (bg.startsWith("#")) return bg;
+  const m = bg.match(/#[0-9a-fA-F]{3,8}/);
+  return m ? m[0] : colors.green;
+};
 
 export default function AdminPromotionsScreen() {
   const navigation = useNavigation();
@@ -78,22 +85,26 @@ export default function AdminPromotionsScreen() {
             {(coupons.data ?? []).map((c) => (
               <Pressable key={c.id} style={styles.card} onPress={() => setCouponEdit(c)}>
                 <View style={styles.cardTop}>
-                  <View style={styles.codeWrap}>
-                    <Ionicons name="pricetag" size={14} color={colors.green} />
+                  <View style={[styles.discBadge, c.discount_type === "percent" ? styles.discPct : styles.discFlat]}>
+                    <Text style={[styles.discText, c.discount_type === "percent" ? styles.discTextPct : styles.discTextFlat]}>
+                      {discountText(c)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
                     <Text style={styles.code}>{c.code}</Text>
+                    <Text style={styles.cardDesc}>{c.description || "No description"}</Text>
                   </View>
                   <Switch value={c.is_active} onValueChange={() => { updateCoupon({ id: c.id, is_active: !c.is_active }); }} trackColor={{ true: colors.green }} thumbColor={colors.white} />
                 </View>
-                <Text style={styles.cardDesc} numberOfLines={1}>{discountText(c)} · {c.description || "No description"}</Text>
+                <View style={styles.divider} />
                 <View style={styles.cardMetaRow}>
                   <Text style={styles.cardMeta}>
-                    Min ₹{Number(c.min_order_value)} · used {c.times_used}{c.usage_limit ? `/${c.usage_limit}` : ""}
+                    Min ₹{Number(c.min_order_value)} · used {c.times_used}{c.usage_limit ? `/${c.usage_limit}` : ""} · till {dayLabel(c.valid_until)}
                   </Text>
                   <Pressable hitSlop={8} onPress={() => confirmDelete(c.code, () => deleteCoupon(c.id))}>
                     <Ionicons name="trash-outline" size={17} color={colors.error} />
                   </Pressable>
                 </View>
-                <Text style={styles.validity}>Valid {dayLabel(c.valid_from)} → {dayLabel(c.valid_until)}</Text>
               </Pressable>
             ))}
             {(coupons.data ?? []).length === 0 ? <Text style={styles.emptySub}>No coupons yet. Tap + to add one.</Text> : null}
@@ -110,12 +121,18 @@ export default function AdminPromotionsScreen() {
           {(banners.data ?? []).map((b) => (
             <Pressable key={b.id} style={styles.card} onPress={() => setBannerEdit(b)}>
               <View style={styles.cardTop}>
-                <Text style={styles.bannerTitle} numberOfLines={1}>{b.title || "Untitled banner"}</Text>
+                <View style={[styles.swatch, { backgroundColor: swatchColor(b.bg_color) }]}>
+                  <Ionicons name="image-outline" size={16} color={colors.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.bannerTitle}>{b.title || "Untitled banner"}</Text>
+                  {b.subtitle ? <Text style={styles.cardDesc}>{b.subtitle}</Text> : null}
+                </View>
                 <Switch value={b.is_active} onValueChange={() => { updateBanner({ id: b.id, is_active: !b.is_active }); }} trackColor={{ true: colors.green }} thumbColor={colors.white} />
               </View>
-              {b.subtitle ? <Text style={styles.cardDesc} numberOfLines={1}>{b.subtitle}</Text> : null}
+              <View style={styles.divider} />
               <View style={styles.cardMetaRow}>
-                <Text style={styles.cardMeta}>Order {b.sort_order}{b.link_url ? ` · ${b.link_url}` : ""}</Text>
+                <Text style={styles.cardMeta} numberOfLines={1}>Order {b.sort_order}{b.link_url ? ` · ${b.link_url}` : ""}</Text>
                 <Pressable hitSlop={8} onPress={() => confirmDelete(b.title || "this banner", () => deleteBanner(b.id))}>
                   <Ionicons name="trash-outline" size={17} color={colors.error} />
                 </Pressable>
@@ -318,14 +335,20 @@ const styles = StyleSheet.create({
 
   list: { paddingHorizontal: spacing(2.5), paddingTop: spacing(2), paddingBottom: spacing(4) },
   card: { backgroundColor: colors.bg, borderRadius: 16, borderWidth: 1, borderColor: colors.lineSoft, padding: spacing(1.75), marginBottom: spacing(1.25), shadowColor: "#1c2b36", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  codeWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
-  code: { fontFamily: fonts.bold, fontSize: 16, color: colors.heading, letterSpacing: 0.5 },
-  bannerTitle: { flex: 1, fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
-  cardDesc: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.text, marginTop: spacing(0.75) },
-  cardMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(1) },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: spacing(1.25) },
+  discBadge: { borderRadius: 10, paddingVertical: spacing(0.75), paddingHorizontal: spacing(1.25), alignItems: "center", justifyContent: "center" },
+  discPct: { backgroundColor: colors.greenTint },
+  discFlat: { backgroundColor: "#fff4d6" },
+  discText: { fontFamily: fonts.bold, fontSize: 13 },
+  discTextPct: { color: colors.green },
+  discTextFlat: { color: "#b98421" },
+  swatch: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  code: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading, letterSpacing: 0.5 },
+  bannerTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.heading },
+  cardDesc: { fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted, marginTop: 2, lineHeight: 17 },
+  divider: { height: 1, backgroundColor: colors.lineSoft, marginTop: spacing(1.5) },
+  cardMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing(1), marginTop: spacing(1.25) },
   cardMeta: { flex: 1, fontFamily: fontsAlt.regular, fontSize: 12, color: colors.muted },
-  validity: { fontFamily: fontsAlt.regular, fontSize: 11, color: colors.muted, marginTop: spacing(0.75) },
   emptySub: { fontFamily: fontsAlt.regular, fontSize: 13, color: colors.muted, textAlign: "center", marginTop: spacing(4) },
 });
 
