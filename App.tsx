@@ -20,6 +20,7 @@ import { api } from "./src/api/baseApi";
 import { ToastProvider } from "./src/components/Toast";
 import { LanguageProvider } from "./src/i18n/LanguageProvider";
 import RootNavigator from "./src/navigation/RootNavigator";
+import ServiceabilityGate from "./src/serviceability/ServiceabilityGate";
 import SplashScreen from "./src/screens/SplashScreen";
 import { store } from "./src/store";
 import { bootstrapped, setUser } from "./src/store/authSlice";
@@ -66,7 +67,11 @@ function Boot() {
   if (!ready || !fontsLoaded) {
     return <SplashScreen />;
   }
-  return <RootNavigator />;
+  return (
+    <ServiceabilityGate>
+      <RootNavigator />
+    </ServiceabilityGate>
+  );
 }
 
 export default function App() {
