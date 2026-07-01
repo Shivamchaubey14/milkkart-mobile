@@ -133,6 +133,8 @@ export type ServiceabilityResult = {
   area: { name?: string; city?: string; delivery_eta_minutes: number | null } | null;
 };
 
+export type WaitlistEntry = { id: number; phone: string; pincode: string; city: string; created_at: string };
+
 // Status of the next-day pre-order window (admin-configured). When `open`,
 // customers may place orders for `next_delivery_date`.
 export type OrderWindow = {
@@ -930,6 +932,10 @@ export const api = createApi({
         return `/serviceability/check/${p.length ? `?${p.join("&")}` : ""}`;
       },
     }),
+    // Public: "notify me when you deliver to my pincode" (waitlist capture).
+    joinWaitlist: build.mutation<WaitlistEntry, { phone: string; pincode: string; city?: string }>({
+      query: (body) => ({ url: "/serviceability/waitlist/", method: "POST", body }),
+    }),
     checkout: build.mutation<
       { order_number: string },
       { address_id: number; delivery_slot_id?: number; delivery_day?: "instant" | "next_day" }
@@ -1386,6 +1392,8 @@ export const {
   useDeliverySlotsQuery,
   useOrderWindowQuery,
   useServiceabilityCheckQuery,
+  useLazyServiceabilityCheckQuery,
+  useJoinWaitlistMutation,
   useCheckoutMutation,
   useOrdersQuery,
   useOrderDetailQuery,
